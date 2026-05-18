@@ -4,9 +4,8 @@ Estimate how busy a small airport’s airspace is over time—similar to Google 
 
 ## Status
 
-Early setup.
+Trying things out.
 
-## Data source (planned)
+[OpenSky Network](https://opensky-network.org/) — non-commercial use per [OpenSky terms](https://opensky-network.org/about/terms-of-use). 
 
-[OpenSky Network](https://opensky-network.org/) 
 
