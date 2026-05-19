@@ -3,7 +3,7 @@
 import time
 from datetime import datetime, timezone
 
-from poll import count_planes_in_bbox
+from airpop.poll import count_planes_in_bbox
 
 # 360 calls/day; OpenSky anonymous states bucket is 400/day.
 POLL_INTERVAL_SEC = 4 * 60
@@ -20,8 +20,12 @@ def run_collector() -> None:
         time.sleep(POLL_INTERVAL_SEC)
 
 
-if __name__ == "__main__":
+def main() -> None:
     try:
         run_collector()
     except KeyboardInterrupt:
         print("stopped")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,10 +1,10 @@
 # Local notes
-PREFERENCES.local.md
-TODO.local.md
+*.local.md
 
 # Python
 __pycache__/
 *.py[cod]
+*.egg-info/
 .venv/
 venv/
 .env

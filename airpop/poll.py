@@ -26,5 +26,9 @@ def count_planes_in_bbox() -> int:
     return count
 
 
-if __name__ == "__main__":
+def main() -> None:
     print(count_planes_in_bbox())
+
+
+if __name__ == "__main__":
+    main()
