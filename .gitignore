@@ -1,6 +1,9 @@
 # Local notes
 *.local.md
 
+# Rules
+.cursor/
+
 # Python
 __pycache__/
 *.py[cod]
