@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Poll counts</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 1.5rem; }
+    #wrap { max-width: 900px; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <h1>Poll counts</h1>
+    <p>From <code>__DB_PATH__</code> — aircraft count per poll.</p>
+    <canvas id="chart" height="120"></canvas>
+  </div>
+  <script>
+    const labels = __LABELS_JSON__;
+    const counts = __COUNTS_JSON__;
+    new Chart(document.getElementById("chart"), {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label: "Count",
+          data: counts,
+          borderColor: "#2563eb",
+          backgroundColor: "rgba(37, 99, 235, 0.1)",
+          fill: true,
+          pointRadius: 0,
+          borderWidth: 1.5,
+        }],
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: { ticks: { maxTicksLimit: 12 } },
+          y: { beginAtZero: true, ticks: { precision: 0 } },
+        },
+      },
+    });
+  </script>
+</body>
+</html>

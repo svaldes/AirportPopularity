@@ -11,7 +11,8 @@ dependencies = [
 [project.scripts]
 poll = "airpop.poll:main"
 collect = "airpop.collector:main"
-sample = "airpop.fixtures:main"
+sample = "airpop.tools.fixtures:main"
+chart = "airpop.tools.plot:main"
 
 [build-system]
 requires = ["setuptools>=61"]
@@ -19,4 +20,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["airpop"]
+include = ["airpop*"]
+
+[tool.setuptools.package-data]
+"airpop.tools" = ["chart_template.html"]
