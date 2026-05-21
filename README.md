@@ -7,6 +7,7 @@ Estimate how busy a small airport’s airspace is over time—similar to Google 
 Run from repo root (creates `data/airport.db`):
 
 - `uv run collect` — poll every 4 min, log to SQLite `poll_samples`
+- `uv run sample` — write 2 weeks of fake samples to `data/sample.db` (for roll-up dev)
 
 [OpenSky Network](https://opensky-network.org/) — non-commercial use per [OpenSky terms](https://opensky-network.org/about/terms-of-use). 
 
