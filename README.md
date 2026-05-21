@@ -4,7 +4,9 @@ Estimate how busy a small airport’s airspace is over time—similar to Google 
 
 ## Status
 
-Trying things out.
+Run from repo root (creates `data/airport.db`):
+
+- `uv run collect` — poll every 4 min, log to SQLite `poll_samples`
 
 [OpenSky Network](https://opensky-network.org/) — non-commercial use per [OpenSky terms](https://opensky-network.org/about/terms-of-use). 
 

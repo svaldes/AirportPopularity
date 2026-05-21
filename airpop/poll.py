@@ -1,15 +1,21 @@
-"""One-shot OpenSky poll: count airborne aircraft in a bbox around a Class D airport."""
+"""OpenSky poll: count airborne aircraft in a bbox around a point."""
 
 from opensky_api import OpenSkyApi
 
-# KVGT (North Las Vegas) — (min_lat, max_lat, min_lon, max_lon)
-KVGT_BBOX = (36.1607, 36.2607, -115.2444, -115.1444)
+# Half-width of bounding box in degrees (~3 NM latitude)
+BBOX_DELTA_DEG = 0.05
 
 
-def count_planes_in_bbox() -> int:
-    """Return count of aircraft in the KVGT bbox (not on ground)."""
+def bbox_from_center(lat: float, lon: float, delta: float = BBOX_DELTA_DEG) -> tuple[float, float, float, float]:
+    """OpenSky bbox: (min_lat, max_lat, min_lon, max_lon)."""
+    return (lat - delta, lat + delta, lon - delta, lon + delta)
+
+
+def count_planes_in_bbox(lat: float, lon: float, delta: float = BBOX_DELTA_DEG) -> int:
+    """Return count of aircraft in the bbox around (lat, lon), not on ground."""
+    bbox = bbox_from_center(lat, lon, delta)
     with OpenSkyApi() as api:
-        result = api.get_states(bbox=KVGT_BBOX)
+        result = api.get_states(bbox=bbox)
 
     if result is None:
         raise RuntimeError("OpenSky request failed or was rate-limited")
@@ -27,7 +33,10 @@ def count_planes_in_bbox() -> int:
 
 
 def main() -> None:
-    print(count_planes_in_bbox())
+    from airpop.collector import AIRPORT
+
+    _, lat, lon = AIRPORT
+    print(count_planes_in_bbox(lat, lon))
 
 
 if __name__ == "__main__":
