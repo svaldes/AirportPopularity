@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from airpop.airports import lookup_airport
 from airpop.collector import POLL_INTERVAL_SEC
 from airpop.db import db_path_for
-from airpop.tools.plot import load_series, render_chart_html
+from airpop.tools.plot import chart_html_for_db
 
 DEFAULT_PORT = 8000
 
@@ -22,16 +22,7 @@ def build_chart_page(icao: str, *, refresh_seconds: int) -> bytes:
         )
         return body.encode("utf-8")
 
-    axis_labels, hour_labels, counts = load_series(db_path, airport.timezone)
-    html = render_chart_html(
-        axis_labels,
-        hour_labels,
-        counts,
-        airport_icao=airport.icao,
-        chart_title=f"{airport.icao} Traffic",
-        refresh_seconds=refresh_seconds,
-    )
-    return html.encode("utf-8")
+    return chart_html_for_db(db_path, refresh_seconds=refresh_seconds).encode("utf-8")
 
 
 def make_handler(icao: str, refresh_seconds: int) -> type[BaseHTTPRequestHandler]:

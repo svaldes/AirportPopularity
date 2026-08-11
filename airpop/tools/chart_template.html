@@ -6,7 +6,15 @@
   __REFRESH_META__
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 1.5rem; }
+    /* --- Theme (tweak these) --- */
+    :root {
+      --font: system-ui, sans-serif;
+      --bar-default: #2563eb;
+      --bar-current: #f59e0b;
+      --grid: rgba(0, 0, 0, 0.06);
+    }
+    /* ----------------------------------- */
+    body { font-family: var(--font); margin: 1.5rem; }
     #wrap { max-width: 900px; }
   </style>
 </head>
@@ -20,6 +28,11 @@
     const axisLabels = __AXIS_LABELS_JSON__;
     const hourLabels = __HOUR_LABELS_JSON__;
     const counts = __COUNTS_JSON__;
+    const barRoles = __BAR_ROLES_JSON__;
+    const css = getComputedStyle(document.documentElement);
+    const barColor = (role) =>
+      css.getPropertyValue(`--bar-${role}`).trim() || css.getPropertyValue("--bar-default").trim();
+    const barColors = barRoles.map(barColor);
     new Chart(document.getElementById("chart"), {
       type: "bar",
       data: {
@@ -27,7 +40,7 @@
         datasets: [{
           label: "Count",
           data: counts,
-          backgroundColor: "#2563eb",
+          backgroundColor: barColors,
           borderWidth: 0,
           borderRadius: 4,
           barPercentage: 0.85,
@@ -53,7 +66,7 @@
           y: {
             beginAtZero: true,
             ticks: { precision: 0 },
-            grid: { color: "rgba(0,0,0,0.06)" },
+            grid: { color: css.getPropertyValue("--grid").trim() },
           },
         },
       },
