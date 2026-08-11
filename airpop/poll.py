@@ -1,6 +1,10 @@
 """OpenSky poll: count airborne aircraft in a bbox around a point."""
 
+import argparse
+
 from opensky_api import OpenSkyApi
+
+from airpop.airports import lookup_airport
 
 # Half-width of bounding box in degrees (~3 NM latitude)
 BBOX_DELTA_DEG = 0.05
@@ -22,7 +26,6 @@ def count_planes_in_bbox(lat: float, lon: float, delta: float = BBOX_DELTA_DEG) 
 
     count = 0
     for state in result.states:
-        # skip aircraft with bad position data
         if state.longitude is None or state.latitude is None:
             continue
         if state.on_ground:
@@ -33,10 +36,11 @@ def count_planes_in_bbox(lat: float, lon: float, delta: float = BBOX_DELTA_DEG) 
 
 
 def main() -> None:
-    from airpop.collector import AIRPORT
-
-    _, lat, lon = AIRPORT
-    print(count_planes_in_bbox(lat, lon))
+    parser = argparse.ArgumentParser(description="One-shot OpenSky aircraft count for an airport")
+    parser.add_argument("icao", help="Airport ICAO code (e.g. KVGT)")
+    args = parser.parse_args()
+    airport = lookup_airport(args.icao)
+    print(count_planes_in_bbox(airport.lat, airport.lon))
 
 
 if __name__ == "__main__":

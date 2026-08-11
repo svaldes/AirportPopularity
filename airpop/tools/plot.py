@@ -8,10 +8,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from airpop.airports import lookup_airport
+
 # --- Plot parameters (forkers: tweak these) ---
-AIRPORT_ICAO = "KVGT"
-CHART_TITLE = f"{AIRPORT_ICAO} Traffic"
-LOCAL_TZ = "America/Los_Angeles"
 DATA_INTERVAL_HOURS = 1  # one chart point per this many hours
 LABEL_INTERVAL_HOURS = 3  # show an axis label every this many hours
 WINDOW_HOURS = 14  # Plot this many hours ending at the latest sample
@@ -21,7 +20,7 @@ CHART_TEMPLATE = Path(__file__).with_name("chart_template.html")
 
 
 def html_path_for_db(db_path: Path) -> Path:
-    """e.g. data/airport.db -> data/airport.html"""
+    """e.g. data/KVGT.db -> data/KVGT.html"""
     return db_path.with_suffix(".html")
 
 
@@ -57,9 +56,9 @@ def format_hour_window(start: datetime, interval_hours: int) -> str:
     return f"{format_hour_label(start)}-{format_hour_label(end)}"
 
 
-def load_series(db_path: Path) -> tuple[list[str], list[str], list[int]]:
+def load_series(db_path: Path, local_tz: str) -> tuple[list[str], list[str], list[int]]:
     """Return (axis_labels, hour_labels, counts) for the last WINDOW_HOURS."""
-    tz = ZoneInfo(LOCAL_TZ)
+    tz = ZoneInfo(local_tz)
     with sqlite3.connect(db_path) as conn:
         rows = conn.execute(
             "SELECT polled_at, count FROM poll_samples ORDER BY polled_at"
@@ -95,15 +94,16 @@ def write_chart_html(
     hour_labels: list[str],
     counts: list[int],
     *,
-    db_path: Path,
+    airport_icao: str,
+    chart_title: str,
     output_path: Path,
     template_path: Path = CHART_TEMPLATE,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     template = template_path.read_text(encoding="utf-8")
     html = (
-        template.replace("__CHART_TITLE__", CHART_TITLE)
-        .replace("__AIRPORT_ICAO__", AIRPORT_ICAO)
+        template.replace("__CHART_TITLE__", chart_title)
+        .replace("__AIRPORT_ICAO__", airport_icao)
         .replace("__AXIS_LABELS_JSON__", json.dumps(axis_labels))
         .replace("__HOUR_LABELS_JSON__", json.dumps(hour_labels))
         .replace("__COUNTS_JSON__", json.dumps(counts))
@@ -113,14 +113,21 @@ def write_chart_html(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot poll_samples to a static HTML chart.")
-    parser.add_argument("db", type=Path, help="SQLite database (e.g. data/airport.db)")
+    parser.add_argument("db", type=Path, help="SQLite database (e.g. data/KVGT.db)")
     args = parser.parse_args()
     if not args.db.exists():
         raise SystemExit(f"Missing {args.db}")
+
+    airport = lookup_airport(args.db.stem)
     output_path = html_path_for_db(args.db)
-    axis_labels, hour_labels, counts = load_series(args.db)
+    axis_labels, hour_labels, counts = load_series(args.db, airport.timezone)
     write_chart_html(
-        axis_labels, hour_labels, counts, db_path=args.db, output_path=output_path
+        axis_labels,
+        hour_labels,
+        counts,
+        airport_icao=airport.icao,
+        chart_title=f"{airport.icao} Traffic",
+        output_path=output_path,
     )
     print(f"wrote {output_path} ({len(counts)} points)")
     print(f"open {output_path.resolve()}")

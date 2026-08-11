@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-DB_PATH = Path("data") / "airport.db"
+DATA_DIR = Path("data")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS poll_samples (
@@ -15,7 +15,12 @@ CREATE TABLE IF NOT EXISTS poll_samples (
 """
 
 
-def init_db(path: Path = DB_PATH) -> None:
+def db_path_for(icao: str) -> Path:
+    """e.g. KVGT -> data/KVGT.db"""
+    return DATA_DIR / f"{icao.upper()}.db"
+
+
+def init_db(path: Path) -> None:
     """Create data directory and poll_samples table if needed."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(path) as conn:
@@ -26,8 +31,8 @@ def init_db(path: Path = DB_PATH) -> None:
 def insert_poll_sample(
     count: int,
     *,
+    path: Path,
     polled_at: datetime | None = None,
-    path: Path = DB_PATH,
 ) -> None:
     """Append one poll result row."""
     init_db(path)
