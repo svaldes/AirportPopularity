@@ -89,6 +89,33 @@ def load_series(db_path: Path, local_tz: str) -> tuple[list[str], list[str], lis
     return axis_labels, hour_labels, counts
 
 
+def render_chart_html(
+    axis_labels: list[str],
+    hour_labels: list[str],
+    counts: list[int],
+    *,
+    airport_icao: str,
+    chart_title: str,
+    refresh_seconds: int | None = None,
+    template_path: Path = CHART_TEMPLATE,
+) -> str:
+    """Fill the chart template; optional browser refresh interval for the live server."""
+    refresh_meta = (
+        f'<meta http-equiv="refresh" content="{refresh_seconds}">'
+        if refresh_seconds
+        else ""
+    )
+    template = template_path.read_text(encoding="utf-8")
+    return (
+        template.replace("__REFRESH_META__", refresh_meta)
+        .replace("__CHART_TITLE__", chart_title)
+        .replace("__AIRPORT_ICAO__", airport_icao)
+        .replace("__AXIS_LABELS_JSON__", json.dumps(axis_labels))
+        .replace("__HOUR_LABELS_JSON__", json.dumps(hour_labels))
+        .replace("__COUNTS_JSON__", json.dumps(counts))
+    )
+
+
 def write_chart_html(
     axis_labels: list[str],
     hour_labels: list[str],
@@ -100,13 +127,13 @@ def write_chart_html(
     template_path: Path = CHART_TEMPLATE,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    template = template_path.read_text(encoding="utf-8")
-    html = (
-        template.replace("__CHART_TITLE__", chart_title)
-        .replace("__AIRPORT_ICAO__", airport_icao)
-        .replace("__AXIS_LABELS_JSON__", json.dumps(axis_labels))
-        .replace("__HOUR_LABELS_JSON__", json.dumps(hour_labels))
-        .replace("__COUNTS_JSON__", json.dumps(counts))
+    html = render_chart_html(
+        axis_labels,
+        hour_labels,
+        counts,
+        airport_icao=airport_icao,
+        chart_title=chart_title,
+        template_path=template_path,
     )
     output_path.write_text(html, encoding="utf-8")
 

@@ -13,6 +13,7 @@ poll = "airpop.poll:main"
 collect = "airpop.collector:main"
 sample = "airpop.tools.fixtures:main"
 chart = "airpop.tools.plot:main"
+serve = "airpop.serve:main"
 
 [build-system]
 requires = ["setuptools>=61"]
