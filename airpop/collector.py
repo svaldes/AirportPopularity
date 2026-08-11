@@ -14,12 +14,12 @@ POLL_INTERVAL_SEC = 4 * 60
 
 
 def run_collector() -> None:
-    icao, lat, lon = AIRPORT
+    _, lat, lon = AIRPORT
     while True:
         ts = datetime.now(timezone.utc).isoformat()
         try:
             n = count_planes_in_bbox(lat, lon)
-            insert_poll_sample(n, airport_icao=icao)
+            insert_poll_sample(n)
             print(f"{ts}  count={n}  saved")
         except RuntimeError as e:
             print(f"{ts}  error={e}")

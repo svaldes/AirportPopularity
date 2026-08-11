@@ -10,7 +10,6 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS poll_samples (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     polled_at TEXT NOT NULL,
-    airport_icao TEXT NOT NULL,
     count INTEGER NOT NULL
 );
 """
@@ -27,7 +26,6 @@ def init_db(path: Path = DB_PATH) -> None:
 def insert_poll_sample(
     count: int,
     *,
-    airport_icao: str,
     polled_at: datetime | None = None,
     path: Path = DB_PATH,
 ) -> None:
@@ -37,7 +35,7 @@ def insert_poll_sample(
     ts = when.isoformat()
     with sqlite3.connect(path) as conn:
         conn.execute(
-            "INSERT INTO poll_samples (polled_at, airport_icao, count) VALUES (?, ?, ?)",
-            (ts, airport_icao, count),
+            "INSERT INTO poll_samples (polled_at, count) VALUES (?, ?)",
+            (ts, count),
         )
         conn.commit()

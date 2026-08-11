@@ -29,21 +29,20 @@ def generate_samples(
     *,
     start: datetime,
     interval_sec: int = POLL_INTERVAL_SEC,
-    airport_icao: str = "Sample",
     start_count: int = DEFAULT_START_COUNT,
     db_path: Path = SAMPLE_DB_PATH,
 ) -> None:
     """Write n synthetic rows, spaced interval_sec apart, starting at `start`."""
     init_db(db_path)
     count = start_count
-    rows: list[tuple[str, str, int]] = []
+    rows: list[tuple[str, int]] = []
     for i in range(n):
         when = start + timedelta(seconds=i * interval_sec)
         count = fake_count(count)
-        rows.append((when.isoformat(), airport_icao, count))
+        rows.append((when.isoformat(), count))
     with sqlite3.connect(db_path) as conn:
         conn.executemany(
-            "INSERT INTO poll_samples (polled_at, airport_icao, count) VALUES (?, ?, ?)",
+            "INSERT INTO poll_samples (polled_at, count) VALUES (?, ?)",
             rows,
         )
         conn.commit()
