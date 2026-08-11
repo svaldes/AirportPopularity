@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Poll counts</title>
+  <title>__CHART_TITLE__</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     body { font-family: system-ui, sans-serif; margin: 1.5rem; }
@@ -11,32 +11,49 @@
 </head>
 <body>
   <div id="wrap">
-    <h1>Poll counts</h1>
-    <p>From <code>__DB_PATH__</code> — aircraft count per poll.</p>
+    <h1>__CHART_TITLE__</h1>
+    <p>Aircraft in __AIRPORT_ICAO__ airspace</p>
     <canvas id="chart" height="120"></canvas>
   </div>
   <script>
-    const labels = __LABELS_JSON__;
+    const axisLabels = __AXIS_LABELS_JSON__;
+    const hourLabels = __HOUR_LABELS_JSON__;
     const counts = __COUNTS_JSON__;
     new Chart(document.getElementById("chart"), {
-      type: "line",
+      type: "bar",
       data: {
-        labels,
+        labels: axisLabels,
         datasets: [{
           label: "Count",
           data: counts,
-          borderColor: "#2563eb",
-          backgroundColor: "rgba(37, 99, 235, 0.1)",
-          fill: true,
-          pointRadius: 0,
-          borderWidth: 1.5,
+          backgroundColor: "#2563eb",
+          borderWidth: 0,
+          borderRadius: 4,
+          barPercentage: 0.85,
+          categoryPercentage: 0.9,
         }],
       },
       options: {
         responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => hourLabels[items[0].dataIndex],
+              label: (ctx) => `Max aircraft: ${ctx.parsed.y}`,
+            },
+          },
+        },
         scales: {
-          x: { ticks: { maxTicksLimit: 12 } },
-          y: { beginAtZero: true, ticks: { precision: 0 } },
+          x: {
+            grid: { display: false },
+            ticks: { autoSkip: false, maxRotation: 0 },
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0 },
+            grid: { color: "rgba(0,0,0,0.06)" },
+          },
         },
       },
     });

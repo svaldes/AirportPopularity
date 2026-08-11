@@ -3,7 +3,19 @@
 import argparse
 import json
 import sqlite3
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+# --- Plot parameters (forkers: tweak these) ---
+AIRPORT_ICAO = "KVGT"
+CHART_TITLE = f"{AIRPORT_ICAO} Traffic"
+LOCAL_TZ = "America/Los_Angeles"
+DATA_INTERVAL_HOURS = 1  # one chart point per this many hours
+LABEL_INTERVAL_HOURS = 3  # show an axis label every this many hours
+WINDOW_HOURS = 14  # Plot this many hours ending at the latest sample
+# ---------------------------------------------
 
 CHART_TEMPLATE = Path(__file__).with_name("chart_template.html")
 
@@ -13,19 +25,74 @@ def html_path_for_db(db_path: Path) -> Path:
     return db_path.with_suffix(".html")
 
 
-def load_series(db_path: Path) -> tuple[list[str], list[int]]:
-    """Return (labels, counts) ordered by polled_at."""
+def parse_polled_at(value: str) -> datetime:
+    """Parse UTC timestamp from DB"""
+    dt = datetime.fromisoformat(value)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def floor_to_interval(dt: datetime, interval_hours: int) -> datetime:
+    """Truncate dt down to the start of its DATA_INTERVAL bucket."""
+    hour = (dt.hour // interval_hours) * interval_hours
+    return dt.replace(hour=hour, minute=0, second=0, microsecond=0)
+
+
+def format_hour_label(dt: datetime) -> str:
+    """e.g. 9am, 12pm, 2pm."""
+    h = dt.hour
+    if h == 0:
+        return "12am"
+    if h < 12:
+        return f"{h}am"
+    if h == 12:
+        return "12pm"
+    return f"{h - 12}pm"
+
+
+def format_hour_window(start: datetime, interval_hours: int) -> str:
+    """e.g. 12pm-1pm for a one-hour bucket starting at noon."""
+    end = start + timedelta(hours=interval_hours)
+    return f"{format_hour_label(start)}-{format_hour_label(end)}"
+
+
+def load_series(db_path: Path) -> tuple[list[str], list[str], list[int]]:
+    """Return (axis_labels, hour_labels, counts) for the last WINDOW_HOURS."""
+    tz = ZoneInfo(LOCAL_TZ)
     with sqlite3.connect(db_path) as conn:
         rows = conn.execute(
             "SELECT polled_at, count FROM poll_samples ORDER BY polled_at"
         ).fetchall()
-    labels = [r[0][:16] for r in rows]  # trim ISO string for axis readability
-    counts = [r[1] for r in rows]
-    return labels, counts
+
+    if not rows:
+        return [], [], []
+
+    parsed = [(parse_polled_at(polled_at), count) for polled_at, count in rows]
+    cutoff = max(dt for dt, _ in parsed) - timedelta(hours=WINDOW_HOURS)
+
+    buckets: dict[datetime, list[int]] = defaultdict(list)
+    for polled_at, count in parsed:
+        if polled_at < cutoff:
+            continue
+        local = polled_at.astimezone(tz)
+        buckets[floor_to_interval(local, DATA_INTERVAL_HOURS)].append(count)
+
+    axis_labels: list[str] = []
+    hour_labels: list[str] = []
+    counts: list[int] = []
+    for when in sorted(buckets):
+        counts.append(max(buckets[when]))
+        hour_labels.append(format_hour_window(when, DATA_INTERVAL_HOURS))
+        axis_labels.append(
+            format_hour_label(when) if when.hour % LABEL_INTERVAL_HOURS == 0 else ""
+        )
+    return axis_labels, hour_labels, counts
 
 
 def write_chart_html(
-    labels: list[str],
+    axis_labels: list[str],
+    hour_labels: list[str],
     counts: list[int],
     *,
     db_path: Path,
@@ -35,8 +102,10 @@ def write_chart_html(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     template = template_path.read_text(encoding="utf-8")
     html = (
-        template.replace("__DB_PATH__", str(db_path))
-        .replace("__LABELS_JSON__", json.dumps(labels))
+        template.replace("__CHART_TITLE__", CHART_TITLE)
+        .replace("__AIRPORT_ICAO__", AIRPORT_ICAO)
+        .replace("__AXIS_LABELS_JSON__", json.dumps(axis_labels))
+        .replace("__HOUR_LABELS_JSON__", json.dumps(hour_labels))
         .replace("__COUNTS_JSON__", json.dumps(counts))
     )
     output_path.write_text(html, encoding="utf-8")
@@ -49,8 +118,10 @@ def main() -> None:
     if not args.db.exists():
         raise SystemExit(f"Missing {args.db}")
     output_path = html_path_for_db(args.db)
-    labels, counts = load_series(args.db)
-    write_chart_html(labels, counts, db_path=args.db, output_path=output_path)
+    axis_labels, hour_labels, counts = load_series(args.db)
+    write_chart_html(
+        axis_labels, hour_labels, counts, db_path=args.db, output_path=output_path
+    )
     print(f"wrote {output_path} ({len(counts)} points)")
     print(f"open {output_path.resolve()}")
 
