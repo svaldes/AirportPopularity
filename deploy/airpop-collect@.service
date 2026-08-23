@@ -1,0 +1,16 @@
+[Unit]
+Description=Airport Popularity collector (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/AirportPopularity
+EnvironmentFile=/home/ubuntu/AirportPopularity/deploy/airpop.env
+ExecStart=/home/ubuntu/AirportPopularity/.venv/bin/collect %i
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

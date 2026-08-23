@@ -15,6 +15,7 @@ venv/
 # Data and secrets
 data/
 *.db
+deploy/airpop.env
 
 # OS / editor
 .DS_Store

@@ -40,4 +40,18 @@ uv run poll KVGT
 
 Each deployer runs their own collector with their own credentials.
 
+## VPS collector (systemd)
+
+On the server (paths assume clone at `~/AirportPopularity`):
+
+```bash
+cp deploy/airpop.env.example deploy/airpop.env   # edit secrets
+sudo cp deploy/airpop-collect@.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now airpop-collect@KPAO   # ICAO after @
+sudo systemctl status airpop-collect@KPAO
+```
+
+Logs: `journalctl -u airpop-collect@KPAO -f`
+
 **Terms:** [OpenSky](https://opensky-network.org/about/terms-of-use) · [ADS-B Exchange AUP](https://www.adsbexchange.com/acceptable-use-policy/)
