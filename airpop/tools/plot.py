@@ -3,7 +3,9 @@
 import argparse
 import json
 import sqlite3
+import statistics
 from collections import defaultdict
+from collections.abc import Callable
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import NamedTuple
@@ -20,11 +22,19 @@ LABEL_INTERVAL_HOURS = 3  # show an axis label every this many hours
 CHART_TEMPLATE = Path(__file__).with_name("chart_template.html")
 HOURS_PER_DAY = 24
 
+TypicalAggregator = Callable[[list[int]], float]
+
+
+def aggregate_typical_mean(values: list[int]) -> float:
+    """Uniform average of same-weekday hourly peaks (swap for other weightings)."""
+    return statistics.mean(values)
+
 
 class ChartSeries(NamedTuple):
     axis_labels: list[str]
     hour_labels: list[str]
-    peak_counts: list[int | None]  # peak traffic count per hour; None if no samples
+    peak_counts: list[int | None]  # measured peak traffic count; None if no samples
+    typical_counts: list[float | None]  # same-weekday typical; None if no history
     bar_roles: list[str]  # e.g. "default" or "current" — styled in the template
 
 
@@ -93,6 +103,7 @@ def load_series(
     local_tz: str,
     *,
     on_date: date | None = None,
+    aggregate_typical: TypicalAggregator = aggregate_typical_mean,
 ) -> ChartSeries:
     """Return chart series for one local calendar day (midnight–midnight)."""
     tz = ZoneInfo(local_tz)
@@ -116,20 +127,35 @@ def load_series(
     if day == now_local.date():
         buckets.setdefault((day, now_bucket.hour), [0])
 
+    hourly_peak: dict[tuple[date, int], int] = {
+        key: max(samples) for key, samples in buckets.items()
+    }
+
+    weekday = day.weekday()
     axis_labels: list[str] = []
     hour_labels: list[str] = []
     peak_counts: list[int | None] = []
+    typical_counts: list[float | None] = []
     bar_roles: list[str] = []
     for hour in range(0, HOURS_PER_DAY, DATA_INTERVAL_HOURS):
-        samples = buckets.get((day, hour))
-        peak_counts.append(max(samples) if samples else None)
+        peak_counts.append(hourly_peak.get((day, hour)))
+        same_dow_peaks = [
+            peak
+            for (d, h), peak in hourly_peak.items()
+            if h == hour and d.weekday() == weekday
+        ]
+        typical_counts.append(
+            aggregate_typical(same_dow_peaks) if same_dow_peaks else None
+        )
         hour_labels.append(format_hour_window(hour, DATA_INTERVAL_HOURS))
         axis_labels.append(
             format_hour_label(hour) if hour % LABEL_INTERVAL_HOURS == 0 else ""
         )
         is_current = day == now_local.date() and hour == now_bucket.hour
         bar_roles.append("current" if is_current else "default")
-    return ChartSeries(axis_labels, hour_labels, peak_counts, bar_roles)
+    return ChartSeries(
+        axis_labels, hour_labels, peak_counts, typical_counts, bar_roles
+    )
 
 
 def render_chart_html(
@@ -166,6 +192,7 @@ def render_chart_html(
         .replace("__AXIS_LABELS_JSON__", json.dumps(series.axis_labels))
         .replace("__HOUR_LABELS_JSON__", json.dumps(series.hour_labels))
         .replace("__COUNTS_JSON__", json.dumps(series.peak_counts))
+        .replace("__TYPICAL_JSON__", json.dumps(series.typical_counts))
         .replace("__BAR_ROLES_JSON__", json.dumps(series.bar_roles))
     )
 
