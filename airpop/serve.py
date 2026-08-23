@@ -1,7 +1,9 @@
 """Local HTTP server: serve a live chart that rebuilds from the DB on each request."""
 
 import argparse
+from datetime import date
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
 
 from airpop.airports import lookup_airport
 from airpop.collector import POLL_INTERVAL_SEC
@@ -11,7 +13,21 @@ from airpop.tools.plot import chart_html_for_db
 DEFAULT_PORT = 8000
 
 
-def build_chart_page(icao: str, *, refresh_seconds: int) -> bytes:
+def parse_on_date(query: dict[str, list[str]]) -> date | None:
+    """Parse ?date=YYYY-MM-DD; invalid values ignored (caller uses today)."""
+    raw_list = query.get("date")
+    if not raw_list:
+        return None
+    raw = raw_list[0].strip()
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def build_chart_page(
+    icao: str, *, refresh_seconds: int, on_date: date | None = None
+) -> bytes:
     airport = lookup_airport(icao)
     db_path = db_path_for(airport.icao)
     if not db_path.exists():
@@ -22,20 +38,27 @@ def build_chart_page(icao: str, *, refresh_seconds: int) -> bytes:
         )
         return body.encode("utf-8")
 
-    return chart_html_for_db(db_path, refresh_seconds=refresh_seconds).encode("utf-8")
+    return chart_html_for_db(
+        db_path, on_date=on_date, refresh_seconds=refresh_seconds
+    ).encode("utf-8")
 
 
 def make_handler(icao: str, refresh_seconds: int) -> type[BaseHTTPRequestHandler]:
     class ChartHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
-            if self.path == "/favicon.ico":
+            parsed = urlparse(self.path)
+            path = parsed.path
+            if path == "/favicon.ico":
                 self.send_response(204)
                 self.end_headers()
                 return
-            if self.path not in ("/", f"/{icao}", f"/{icao}/"):
+            if path not in ("/", f"/{icao}", f"/{icao}/"):
                 self.send_error(404, "Not found - try /")
                 return
-            body = build_chart_page(icao, refresh_seconds=refresh_seconds)
+            on_date = parse_on_date(parse_qs(parsed.query))
+            body = build_chart_page(
+                icao, refresh_seconds=refresh_seconds, on_date=on_date
+            )
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))

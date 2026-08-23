@@ -12,16 +12,45 @@
       --bar-default: #2563eb;
       --bar-current: #f59e0b;
       --grid: rgba(0, 0, 0, 0.06);
+      --nav-link: #2563eb;
+      --nav-disabled: #94a3b8;
     }
     /* ----------------------------------- */
     body { font-family: var(--font); margin: 1.5rem; }
     #wrap { max-width: 900px; }
+    .day-nav {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 0.75rem 0 1.25rem;
+      font-size: 1.1rem;
+    }
+    .day-nav a {
+      color: var(--nav-link);
+      text-decoration: none;
+      font-size: 1.75rem;
+      line-height: 1;
+      padding: 0 0.25rem;
+    }
+    .day-nav .disabled {
+      color: var(--nav-disabled);
+      font-size: 1.75rem;
+      line-height: 1;
+      padding: 0 0.25rem;
+      user-select: none;
+    }
+    .day-nav .date-label { font-weight: 600; }
   </style>
 </head>
 <body>
   <div id="wrap">
     <h1>__CHART_TITLE__</h1>
     <p>Aircraft in __AIRPORT_ICAO__ airspace</p>
+    <nav class="day-nav" aria-label="Day">
+      <a class="day-nav-prev" href="__PREV_HREF__" aria-label="Previous day">‹</a>
+      <span class="date-label">__DATE_LABEL__</span>
+      __NEXT_HTML__
+    </nav>
     <canvas id="chart" height="120"></canvas>
   </div>
   <script>
