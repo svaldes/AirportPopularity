@@ -1,0 +1,16 @@
+[Unit]
+Description=Airport Popularity chart server (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/AirportPopularity
+# Localhost only — nginx is the public reverse proxy.
+ExecStart=/home/ubuntu/AirportPopularity/.venv/bin/serve %i --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

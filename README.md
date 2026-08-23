@@ -1,57 +1,35 @@
 # Airport Popularity
 
-Estimate how busy a small airport’s airspace is over time—similar to Google Maps “Popular Times”—using ADS-B data. Longer term: distinguish **pattern work** from **through** traffic.
+Estimate how busy a small airport’s airspace is over time using ADS-B data. 
 
-## Status
+## Run locally
 
-Run from repo root:
+From repo root (`AIRPOP_SOURCE` required):
 
-**Collector** (`airpop/`):
+| Command | What it does |
+|---------|----------------|
+| `uv run poll KVGT` | One-shot aircraft count |
+| `uv run collect KVGT` | Poll every 5 min → `data/KVGT.db` |
+| `uv run serve KVGT` | Chart at http://127.0.0.1:8000/ |
+| `uv run sample` | Fake data → `data/sample.db` |
+| `uv run chart data/KVGT.db` | Static HTML snapshot |
 
-- Airports: `airports.json` (lat/lon seed list)
-- `uv run poll KVGT` — one-shot aircraft count
-- `uv run collect KVGT` — poll every 5 min → `data/KVGT.db`
-- `uv run serve KVGT` — live chart at http://127.0.0.1:8000/
-- `uv run serve KVGT --host 0.0.0.0` — bind all interfaces (open the port in the VPS firewall)
-
-**Dev tools** (`airpop/tools/`):
-
-- `uv run sample` — fake 2 weeks of data → `data/sample.db`
-- `uv run chart data/KVGT.db` — writes `data/KVGT.html` (static snapshot)
+Airports: `airports.json`.
 
 ## Data sources
 
-ADS-B data can come from one of several sources. **`AIRPOP_SOURCE` must be set** in the environment.
-
-| `AIRPOP_SOURCE` | Meaning |
+| `AIRPOP_SOURCE` | Notes |
 |-----------------|--------|
-| `opensky` | [OpenSky Network](https://opensky-network.org/) — free, non-commercial |
-| `adsbx` | [ADS-B Exchange](https://www.adsbexchange.com/) Paid API via RapidAPI; Compatible with Lightsail/AWS |
-| `local` | Your own receiver (e.g. tar1090 / readsb JSON) — planned |
-
-Example for `adsbx`:
-
-```bash
-export AIRPOP_SOURCE=adsbx
-export ADSBX_RAPIDAPI_KEY=...
-export ADSBX_RAPIDAPI_HOST=adsbexchange-com1.p.rapidapi.com
-uv run poll KVGT
-```
+| `opensky` | Free, non-commercial; often blocked from hyperscaler IPs |
+| `adsbx` | RapidAPI key (`ADSBX_RAPIDAPI_KEY`, `ADSBX_RAPIDAPI_HOST`) |
+| `local` | Own receiver — planned |
 
 Each deployer runs their own collector with their own credentials.
 
-## VPS collector (systemd)
+## Deploy
 
-On the server (paths assume clone at `~/AirportPopularity`):
+VPS setup: **[deploy/README.md](deploy/README.md)**.
 
-```bash
-cp deploy/airpop.env.example deploy/airpop.env   # edit secrets
-sudo cp deploy/airpop-collect@.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now airpop-collect@KPAO   # ICAO after @
-sudo systemctl status airpop-collect@KPAO
-```
+## Terms
 
-Logs: `journalctl -u airpop-collect@KPAO -f`
-
-**Terms:** [OpenSky](https://opensky-network.org/about/terms-of-use) · [ADS-B Exchange AUP](https://www.adsbexchange.com/acceptable-use-policy/)
+[OpenSky](https://opensky-network.org/about/terms-of-use) · [ADS-B Exchange AUP](https://www.adsbexchange.com/acceptable-use-policy/)
