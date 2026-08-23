@@ -54,6 +54,11 @@ def main() -> None:
     )
     parser.add_argument("icao", help="Airport ICAO code (e.g. KVGT)")
     parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Bind address (default 127.0.0.1; use 0.0.0.0 for external access)",
+    )
+    parser.add_argument(
         "--port",
         type=int,
         default=DEFAULT_PORT,
@@ -68,8 +73,8 @@ def main() -> None:
     args = parser.parse_args()
     airport = lookup_airport(args.icao)
     handler = make_handler(airport.icao, args.refresh)
-    server = HTTPServer(("127.0.0.1", args.port), handler)
-    print(f"serving {airport.icao} at http://127.0.0.1:{args.port}/  (Ctrl+C to stop)")
+    server = HTTPServer((args.host, args.port), handler)
+    print(f"serving {airport.icao} at http://{args.host}:{args.port}/  (Ctrl+C to stop)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

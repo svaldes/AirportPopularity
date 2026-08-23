@@ -12,6 +12,7 @@ Run from repo root:
 - `uv run poll KVGT` — one-shot aircraft count
 - `uv run collect KVGT` — poll every 5 min → `data/KVGT.db`
 - `uv run serve KVGT` — live chart at http://127.0.0.1:8000/
+- `uv run serve KVGT --host 0.0.0.0` — bind all interfaces (open the port in the VPS firewall)
 
 **Dev tools** (`airpop/tools/`):
 
