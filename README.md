@@ -10,7 +10,7 @@ Run from repo root:
 
 - Airports: `airports.json` (lat/lon seed list)
 - `uv run poll KVGT` — one-shot aircraft count
-- `uv run collect KVGT` — poll every 4 min → `data/KVGT.db`
+- `uv run collect KVGT` — poll every 5 min → `data/KVGT.db`
 - `uv run serve KVGT` — live chart at http://127.0.0.1:8000/
 
 **Dev tools** (`airpop/tools/`):
@@ -18,6 +18,25 @@ Run from repo root:
 - `uv run sample` — fake 2 weeks of data → `data/sample.db`
 - `uv run chart data/KVGT.db` — writes `data/KVGT.html` (static snapshot)
 
-[OpenSky Network](https://opensky-network.org/) — non-commercial use per [OpenSky terms](https://opensky-network.org/about/terms-of-use). 
+## Data sources
 
+ADS-B data can come from one of several sources. **`AIRPOP_SOURCE` must be set** in the environment.
 
+| `AIRPOP_SOURCE` | Meaning |
+|-----------------|--------|
+| `opensky` | [OpenSky Network](https://opensky-network.org/) — free, non-commercial |
+| `adsbx` | [ADS-B Exchange](https://www.adsbexchange.com/) Paid API via RapidAPI; Compatible with Lightsail/AWS |
+| `local` | Your own receiver (e.g. tar1090 / readsb JSON) — planned |
+
+Example for `adsbx`:
+
+```bash
+export AIRPOP_SOURCE=adsbx
+export ADSBX_RAPIDAPI_KEY=...
+export ADSBX_RAPIDAPI_HOST=adsbexchange-com1.p.rapidapi.com
+uv run poll KVGT
+```
+
+Each deployer runs their own collector with their own credentials.
+
+**Terms:** [OpenSky](https://opensky-network.org/about/terms-of-use) · [ADS-B Exchange AUP](https://www.adsbexchange.com/acceptable-use-policy/)

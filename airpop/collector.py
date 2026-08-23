@@ -1,4 +1,4 @@
-"""Poll OpenSky on a fixed interval and log counts to SQLite."""
+"""Poll an ADS-B source on a fixed interval and log counts to SQLite."""
 
 import argparse
 import time
@@ -6,20 +6,21 @@ from datetime import datetime, timezone
 
 from airpop.airports import lookup_airport
 from airpop.db import db_path_for, insert_poll_sample
-from airpop.poll import count_planes_in_bbox
+from airpop.sources import count_airborne, resolve_source_name
 
-# 360 calls/day; OpenSky anonymous states bucket is 400/day.
-POLL_INTERVAL_SEC = 4 * 60
+# ~288 calls/day; fits OpenSky anonymous (~400/day) and ADSBX Community (~10k/month).
+POLL_INTERVAL_SEC = 5 * 60
 
 
 def run_collector(icao: str) -> None:
     airport = lookup_airport(icao)
+    source = resolve_source_name()
     path = db_path_for(airport.icao)
-    print(f"collecting {airport.icao} → {path} (every {POLL_INTERVAL_SEC}s)")
+    print(f"collecting {airport.icao} via {source} → {path} (every {POLL_INTERVAL_SEC}s)")
     while True:
         ts = datetime.now(timezone.utc).isoformat()
         try:
-            n = count_planes_in_bbox(airport.lat, airport.lon)
+            n = count_airborne(airport.lat, airport.lon)
             insert_poll_sample(n, path=path)
             print(f"{ts}  count={n}  saved")
         except RuntimeError as e:
@@ -28,7 +29,9 @@ def run_collector(icao: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Poll OpenSky on an interval; log to data/<ICAO>.db")
+    parser = argparse.ArgumentParser(
+        description="Poll AIRPOP_SOURCE on an interval; log to data/<ICAO>.db"
+    )
     parser.add_argument("icao", help="Airport ICAO code (e.g. KVGT)")
     args = parser.parse_args()
     try:
