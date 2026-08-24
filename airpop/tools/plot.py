@@ -14,19 +14,28 @@ from zoneinfo import ZoneInfo
 from airpop.airports import lookup_airport
 
 # --- Plot parameters (forkers: tweak these) ---
-DATA_INTERVAL_HOURS = 1  # one chart point per this many hours
-LABEL_INTERVAL_HOURS = 3  # show an axis label every this many hours
+DATA_INTERVAL_MINUTES = 120  # bar width / bucket size; one chart point each
+LABEL_INTERVAL_MINUTES = 120 * 2  # show an axis label every this many minutes
 # Bar roles ("default" / "current"); colors live in chart_template.html
 # ---------------------------------------------
 
 CHART_TEMPLATE = Path(__file__).with_name("chart_template.html")
-HOURS_PER_DAY = 24
+MINUTES_PER_DAY = 24 * 60
+
+
+def validate_interval_minutes(slot_mins: int = DATA_INTERVAL_MINUTES) -> int:
+    """Ensure the data interval divides a day evenly."""
+    if slot_mins <= 0 or MINUTES_PER_DAY % slot_mins != 0:
+        raise ValueError(
+            f"DATA_INTERVAL_MINUTES={slot_mins} must be > 0 and divide {MINUTES_PER_DAY}"
+        )
+    return slot_mins
 
 TypicalAggregator = Callable[[list[int]], float]
 
 
 def aggregate_typical_mean(values: list[int]) -> float:
-    """Uniform average of same-weekday hourly peaks (swap for other weightings)."""
+    """Uniform average of same-weekday slot peaks (swap for other weightings)."""
     return statistics.mean(values)
 
 
@@ -51,22 +60,31 @@ def parse_polled_at(value: str) -> datetime:
     return dt
 
 
-def floor_to_interval(dt: datetime, interval_hours: int) -> datetime:
-    """Truncate dt down to the start of its DATA_INTERVAL bucket."""
-    hour = (dt.hour // interval_hours) * interval_hours
-    return dt.replace(hour=hour, minute=0, second=0, microsecond=0)
+def floor_to_slot_minutes(dt: datetime, slot_mins: int) -> int:
+    """Minutes from local midnight at the start of dt's data interval."""
+    minutes = dt.hour * 60 + dt.minute
+    return (minutes // slot_mins) * slot_mins
 
 
-def format_hour_label(hour: int) -> str:
-    """e.g. 9am, 12pm, 2pm."""
-    h = hour % 24
+def format_clock_label(minutes: int) -> str:
+    """e.g. 9am, 1:30pm, 12am."""
+    minutes = minutes % MINUTES_PER_DAY
+    h, m = divmod(minutes, 60)
     if h == 0:
-        return "12am"
-    if h < 12:
-        return f"{h}am"
-    if h == 12:
-        return "12pm"
-    return f"{h - 12}pm"
+        base = "12"
+        suffix = "am"
+    elif h < 12:
+        base = str(h)
+        suffix = "am"
+    elif h == 12:
+        base = "12"
+        suffix = "pm"
+    else:
+        base = str(h - 12)
+        suffix = "pm"
+    if m:
+        return f"{base}:{m:02d}{suffix}"
+    return f"{base}{suffix}"
 
 
 def format_date_label(day: date) -> str:
@@ -81,21 +99,26 @@ def resolve_chart_day(local_tz: str, on_date: date | None) -> date:
     return today if day > today else day
 
 
-def day_nav_hrefs(day: date, *, today: date) -> tuple[str, str, str]:
-    """Return (prev_href, next_href_or_empty, date_label). Next empty when day is today."""
+def day_nav_hrefs(day: date, *, today: date) -> tuple[str, str, str, str]:
+    """Return (prev_href, next_href, today_href, date_label).
+
+    next_href / today_href are empty when day is already today.
+    """
     prev = day - timedelta(days=1)
     prev_href = f"/?date={prev.isoformat()}"
-    next_href = (
-        ""
-        if day >= today
-        else f"/?date={(day + timedelta(days=1)).isoformat()}"
+    today_href = f"/?date={today.isoformat()}"
+    if day >= today:
+        return prev_href, "", "", format_date_label(day)
+    next_href = f"/?date={(day + timedelta(days=1)).isoformat()}"
+    return prev_href, next_href, today_href, format_date_label(day)
+
+
+def format_slot_window(start_minutes: int, slot_mins: int) -> str:
+    """e.g. 12pm-1:30pm for a 1.5h bucket starting at noon."""
+    return (
+        f"{format_clock_label(start_minutes)}-"
+        f"{format_clock_label(start_minutes + slot_mins)}"
     )
-    return prev_href, next_href, format_date_label(day)
-
-
-def format_hour_window(hour: int, interval_hours: int) -> str:
-    """e.g. 12pm-1pm for a one-hour bucket starting at noon."""
-    return f"{format_hour_label(hour)}-{format_hour_label(hour + interval_hours)}"
 
 
 def load_series(
@@ -106,28 +129,30 @@ def load_series(
     aggregate_typical: TypicalAggregator = aggregate_typical_mean,
 ) -> ChartSeries:
     """Return chart series for one local calendar day (midnight–midnight)."""
+    slot_mins = validate_interval_minutes()
+    label_every_mins = LABEL_INTERVAL_MINUTES
     tz = ZoneInfo(local_tz)
     now_local = datetime.now(tz)
     day = resolve_chart_day(local_tz, on_date)
-    now_bucket = floor_to_interval(now_local, DATA_INTERVAL_HOURS)
+    now_slot = floor_to_slot_minutes(now_local, slot_mins)
 
     with sqlite3.connect(db_path) as conn:
         rows = conn.execute(
             "SELECT polled_at, count FROM poll_samples ORDER BY polled_at"
         ).fetchall()
 
-    # (date, hour) -> sample counts in that local hour
+    # (date, slot_start_minutes) -> sample counts in that local bucket
     buckets: dict[tuple[date, int], list[int]] = defaultdict(list)
     for polled_at, count in rows:
         local = parse_polled_at(polled_at).astimezone(tz)
-        bucket = floor_to_interval(local, DATA_INTERVAL_HOURS)
-        buckets[(bucket.date(), bucket.hour)].append(count)
+        slot = floor_to_slot_minutes(local, slot_mins)
+        buckets[(local.date(), slot)].append(count)
 
-    # Show the current hour on today even if no polls have landed yet.
+    # Show the current slot on today even if no polls have landed yet.
     if day == now_local.date():
-        buckets.setdefault((day, now_bucket.hour), [0])
+        buckets.setdefault((day, now_slot), [0])
 
-    hourly_peak: dict[tuple[date, int], int] = {
+    slot_peak: dict[tuple[date, int], int] = {
         key: max(samples) for key, samples in buckets.items()
     }
 
@@ -137,21 +162,21 @@ def load_series(
     peak_counts: list[int | None] = []
     typical_counts: list[float | None] = []
     bar_roles: list[str] = []
-    for hour in range(0, HOURS_PER_DAY, DATA_INTERVAL_HOURS):
-        peak_counts.append(hourly_peak.get((day, hour)))
+    for start in range(0, MINUTES_PER_DAY, slot_mins):
+        peak_counts.append(slot_peak.get((day, start)))
         same_dow_peaks = [
             peak
-            for (d, h), peak in hourly_peak.items()
-            if h == hour and d.weekday() == weekday
+            for (d, slot), peak in slot_peak.items()
+            if slot == start and d.weekday() == weekday
         ]
         typical_counts.append(
             aggregate_typical(same_dow_peaks) if same_dow_peaks else None
         )
-        hour_labels.append(format_hour_window(hour, DATA_INTERVAL_HOURS))
+        hour_labels.append(format_slot_window(start, slot_mins))
         axis_labels.append(
-            format_hour_label(hour) if hour % LABEL_INTERVAL_HOURS == 0 else ""
+            format_clock_label(start) if start % label_every_mins == 0 else ""
         )
-        is_current = day == now_local.date() and hour == now_bucket.hour
+        is_current = day == now_local.date() and start == now_slot
         bar_roles.append("current" if is_current else "default")
     return ChartSeries(
         axis_labels, hour_labels, peak_counts, typical_counts, bar_roles
@@ -170,11 +195,19 @@ def render_chart_html(
 ) -> str:
     """Fill the chart template; optional browser refresh interval for the live server."""
     today = datetime.now(ZoneInfo(local_tz)).date()
-    prev_href, next_href, date_label = day_nav_hrefs(on_date, today=today)
+    prev_href, next_href, today_href, date_label = day_nav_hrefs(on_date, today=today)
     if next_href:
         next_html = f'<a class="day-nav-next" href="{next_href}" aria-label="Next day">›</a>'
     else:
         next_html = '<span class="day-nav-next disabled" aria-disabled="true">›</span>'
+    if today_href:
+        today_html = (
+            f'<a class="day-nav-today" href="{today_href}" aria-label="Today">»</a>'
+        )
+    else:
+        today_html = (
+            '<span class="day-nav-today disabled" aria-disabled="true">»</span>'
+        )
 
     refresh_meta = (
         f'<meta http-equiv="refresh" content="{refresh_seconds}">'
@@ -189,6 +222,7 @@ def render_chart_html(
         .replace("__DATE_LABEL__", date_label)
         .replace("__PREV_HREF__", prev_href)
         .replace("__NEXT_HTML__", next_html)
+        .replace("__TODAY_HTML__", today_html)
         .replace("__AXIS_LABELS_JSON__", json.dumps(series.axis_labels))
         .replace("__HOUR_LABELS_JSON__", json.dumps(series.hour_labels))
         .replace("__COUNTS_JSON__", json.dumps(series.peak_counts))
@@ -253,7 +287,7 @@ def main() -> None:
     output_path = html_path_for_db(args.db)
     series = write_chart_html(args.db, output_path=output_path)
     points = sum(1 for c in series.peak_counts if c is not None)
-    print(f"wrote {output_path} ({points} hours with data)")
+    print(f"wrote {output_path} ({points} slots with data)")
     print(f"open {output_path.resolve()}")
 
 
