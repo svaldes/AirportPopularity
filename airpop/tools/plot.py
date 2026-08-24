@@ -12,6 +12,7 @@ from typing import NamedTuple
 from zoneinfo import ZoneInfo
 
 from airpop.airports import lookup_airport
+from airpop.collector import POLL_INTERVAL_SEC
 
 # --- Plot parameters (forkers: tweak these) ---
 DATA_INTERVAL_MINUTES = 120  # bar width / bucket size; one chart point each
@@ -30,6 +31,16 @@ def validate_interval_minutes(slot_mins: int = DATA_INTERVAL_MINUTES) -> int:
             f"DATA_INTERVAL_MINUTES={slot_mins} must be > 0 and divide {MINUTES_PER_DAY}"
         )
     return slot_mins
+
+
+def expected_samples_per_slot(slot_mins: int = DATA_INTERVAL_MINUTES) -> int:
+    """Polls needed to treat a slot as complete (for peaks / typical)."""
+    slot_secs = slot_mins * 60
+    if slot_secs % POLL_INTERVAL_SEC != 0:
+        raise ValueError(
+            f"slot {slot_mins}m must be a multiple of POLL_INTERVAL_SEC={POLL_INTERVAL_SEC}"
+        )
+    return slot_secs // POLL_INTERVAL_SEC
 
 TypicalAggregator = Callable[[list[int]], float]
 
@@ -148,22 +159,28 @@ def load_series(
         slot = floor_to_slot_minutes(local, slot_mins)
         buckets[(local.date(), slot)].append(count)
 
-    # Show the current slot on today even if no polls have landed yet.
-    if day == now_local.date():
-        buckets.setdefault((day, now_slot), [0])
-
+    expected = expected_samples_per_slot(slot_mins)
+    # Complete slots only — feed measured history and typical.
     slot_peak: dict[tuple[date, int], int] = {
-        key: max(samples) for key, samples in buckets.items()
+        key: max(samples)
+        for key, samples in buckets.items()
+        if len(samples) >= expected
     }
 
     weekday = day.weekday()
+    viewing_today = day == now_local.date()
     axis_labels: list[str] = []
     hour_labels: list[str] = []
     peak_counts: list[int | None] = []
     typical_counts: list[float | None] = []
     bar_roles: list[str] = []
     for start in range(0, MINUTES_PER_DAY, slot_mins):
-        peak_counts.append(slot_peak.get((day, start)))
+        is_current = viewing_today and start == now_slot
+        peak = slot_peak.get((day, start))
+        if peak is None and is_current:
+            live = buckets.get((day, start), [])
+            peak = max(live) if live else 0
+        peak_counts.append(peak)
         same_dow_peaks = [
             peak
             for (d, slot), peak in slot_peak.items()
@@ -176,7 +193,6 @@ def load_series(
         axis_labels.append(
             format_clock_label(start) if start % label_every_mins == 0 else ""
         )
-        is_current = day == now_local.date() and start == now_slot
         bar_roles.append("current" if is_current else "default")
     return ChartSeries(
         axis_labels, hour_labels, peak_counts, typical_counts, bar_roles
