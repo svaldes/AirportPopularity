@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, urlparse
 from airpop.airports import lookup_airport
 from airpop.collector import POLL_INTERVAL_SEC
 from airpop.db import db_path_for
-from airpop.tools.plot import chart_html_for_db
+from airpop.tools.plot import chart_html, chart_json
 
 DEFAULT_PORT = 8000
 
@@ -33,6 +33,14 @@ def parse_embed(query: dict[str, list[str]]) -> bool:
     return raw_list[0].strip() == "1"
 
 
+def parse_poll(query: dict[str, list[str]]) -> bool:
+    """True when ?poll=1 (series payload for in-page polling)."""
+    raw_list = query.get("poll")
+    if not raw_list:
+        return False
+    return raw_list[0].strip() == "1"
+
+
 def build_chart_page(
     icao: str,
     *,
@@ -50,7 +58,7 @@ def build_chart_page(
         )
         return body.encode("utf-8")
 
-    return chart_html_for_db(
+    return chart_html(
         db_path,
         on_date=on_date,
         refresh_seconds=refresh_seconds,
@@ -73,6 +81,19 @@ def make_handler(icao: str, refresh_seconds: int) -> type[BaseHTTPRequestHandler
             query = parse_qs(parsed.query)
             on_date = parse_on_date(query)
             embed = parse_embed(query)
+            if parse_poll(query):
+                airport = lookup_airport(icao)
+                db_path = db_path_for(airport.icao)
+                if not db_path.exists():
+                    self.send_error(404, "No database")
+                    return
+                body = chart_json(db_path, on_date=on_date).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
             body = build_chart_page(
                 icao,
                 refresh_seconds=refresh_seconds,
@@ -111,7 +132,7 @@ def main() -> None:
         "--refresh",
         type=int,
         default=POLL_INTERVAL_SEC,
-        help=f"Browser auto-refresh seconds (default {POLL_INTERVAL_SEC})",
+        help=f"Browser poll interval in seconds (default {POLL_INTERVAL_SEC}; 0 disables)",
     )
     args = parser.parse_args()
     airport = lookup_airport(args.icao)

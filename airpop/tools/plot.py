@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import NamedTuple
 from zoneinfo import ZoneInfo
 
-from airpop.airports import lookup_airport
+from airpop.airports import Airport, lookup_airport
 from airpop.collector import POLL_INTERVAL_SEC
 
 # --- Plot parameters (forkers: tweak these) ---
@@ -58,7 +58,7 @@ class ChartSeries(NamedTuple):
     bar_roles: list[str]  # e.g. "default" or "current" — styled in the template
 
 
-def html_path_for_db(db_path: Path) -> Path:
+def html_path(db_path: Path) -> Path:
     """e.g. data/KVGT.db -> data/KVGT.html"""
     return db_path.with_suffix(".html")
 
@@ -213,7 +213,7 @@ def render_chart_html(
     embed: bool = False,
     template_path: Path = CHART_TEMPLATE,
 ) -> str:
-    """Fill the chart template; optional browser refresh interval for the live server."""
+    """Fill the chart template; optional live-server poll interval (seconds)."""
     today = datetime.now(ZoneInfo(local_tz)).date()
     prev_href, next_href, today_href, date_label = day_nav_hrefs(
         on_date, today=today, embed=embed
@@ -231,16 +231,12 @@ def render_chart_html(
             '<span class="day-nav-today disabled" aria-disabled="true">»</span>'
         )
 
-    refresh_meta = (
-        f'<meta http-equiv="refresh" content="{refresh_seconds}">'
-        if refresh_seconds
-        else ""
-    )
     template = template_path.read_text(encoding="utf-8")
     html_class = ' class="embed"' if embed else ""
+    poll_seconds = str(refresh_seconds) if refresh_seconds else "0"
     return (
         template.replace("__HTML_CLASS__", html_class)
-        .replace("__REFRESH_META__", refresh_meta)
+        .replace("__POLL_SECONDS__", poll_seconds)
         .replace("__CHART_TITLE__", chart_title)
         .replace("__AIRPORT_ICAO__", airport_icao)
         .replace("__DATE_LABEL__", date_label)
@@ -255,7 +251,17 @@ def render_chart_html(
     )
 
 
-def chart_html_for_db(
+def load_chart(
+    db_path: Path, *, on_date: date | None = None
+) -> tuple[Airport, date, ChartSeries]:
+    """Airport, calendar day, and series for a chart (HTML or poll JSON)."""
+    airport = lookup_airport(db_path.stem)
+    day = resolve_chart_day(airport.timezone, on_date)
+    series = load_series(db_path, airport.timezone, on_date=day)
+    return airport, day, series
+
+
+def chart_html(
     db_path: Path,
     *,
     on_date: date | None = None,
@@ -264,9 +270,7 @@ def chart_html_for_db(
     template_path: Path = CHART_TEMPLATE,
 ) -> str:
     """Load series and render HTML (styling lives in the chart template)."""
-    airport = lookup_airport(db_path.stem)
-    day = resolve_chart_day(airport.timezone, on_date)
-    series = load_series(db_path, airport.timezone, on_date=day)
+    airport, day, series = load_chart(db_path, on_date=on_date)
     return render_chart_html(
         series,
         airport_icao=airport.icao,
@@ -279,6 +283,21 @@ def chart_html_for_db(
     )
 
 
+def chart_json(db_path: Path, *, on_date: date | None = None) -> str:
+    """JSON payload for live-server polling (same series as the HTML chart)."""
+    airport, day, series = load_chart(db_path, on_date=on_date)
+    return json.dumps(
+        {
+            "axis_labels": series.axis_labels,
+            "hour_labels": series.hour_labels,
+            "counts": series.peak_counts,
+            "typical": series.typical_counts,
+            "bar_roles": series.bar_roles,
+            "date_label": format_date_label(day),
+        }
+    )
+
+
 def write_chart_html(
     db_path: Path,
     *,
@@ -287,9 +306,7 @@ def write_chart_html(
     template_path: Path = CHART_TEMPLATE,
 ) -> ChartSeries:
     """Render chart HTML to disk; returns the series (for CLI point count)."""
-    airport = lookup_airport(db_path.stem)
-    day = resolve_chart_day(airport.timezone, on_date)
-    series = load_series(db_path, airport.timezone, on_date=day)
+    airport, day, series = load_chart(db_path, on_date=on_date)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     html = render_chart_html(
         series,
@@ -310,7 +327,7 @@ def main() -> None:
     if not args.db.exists():
         raise SystemExit(f"Missing {args.db}")
 
-    output_path = html_path_for_db(args.db)
+    output_path = html_path(args.db)
     series = write_chart_html(args.db, output_path=output_path)
     points = sum(1 for c in series.peak_counts if c is not None)
     print(f"wrote {output_path} ({points} slots with data)")

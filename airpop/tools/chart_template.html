@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>__CHART_TITLE__</title>
-  __REFRESH_META__
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
@@ -198,10 +197,11 @@
   </div>
   <script>
     const axisLabels = __AXIS_LABELS_JSON__;
-    const hourLabels = __HOUR_LABELS_JSON__;
+    let hourLabels = __HOUR_LABELS_JSON__;
     const counts = __COUNTS_JSON__;
     const typical = __TYPICAL_JSON__;
     const barRoles = __BAR_ROLES_JSON__;
+    const pollSeconds = __POLL_SECONDS__;
     const css = getComputedStyle(document.documentElement);
     const measuredOpacity = css.getPropertyValue("--bar-measured-opacity").trim() || "0.7";
     const barColor = (role) =>
@@ -222,7 +222,7 @@
     const measuredColors = barRoles.map((role) => withOpacity(barColor(role), measuredOpacity));
     const typicalColor = css.getPropertyValue("--bar-typical").trim() || "#94a3b8";
     const tickColor = css.getPropertyValue("--ink-muted").trim() || "#3d5c6a";
-    new Chart(document.getElementById("chart"), {
+    const chart = new Chart(document.getElementById("chart"), {
       type: "bar",
       data: {
         labels: axisLabels,
@@ -295,6 +295,28 @@
         },
       },
     });
+    if (pollSeconds > 0) {
+      const pollUrl = new URL(window.location.href);
+      pollUrl.searchParams.set("poll", "1");
+      const applyPayload = (payload) => {
+        hourLabels = payload.hour_labels;
+        chart.data.labels = payload.axis_labels;
+        chart.data.datasets[0].data = payload.typical;
+        chart.data.datasets[1].data = payload.counts;
+        chart.data.datasets[1].backgroundColor = payload.bar_roles.map((role) =>
+          withOpacity(barColor(role), measuredOpacity)
+        );
+        chart.update("none");
+        const dateEl = document.querySelector(".date-label");
+        if (dateEl && payload.date_label) dateEl.textContent = payload.date_label;
+      };
+      setInterval(() => {
+        fetch(pollUrl)
+          .then((r) => (r.ok ? r.json() : Promise.reject()))
+          .then(applyPayload)
+          .catch(() => {});
+      }, pollSeconds * 1000);
+    }
   </script>
 </body>
 </html>
