@@ -21,6 +21,9 @@ LABEL_INTERVAL_MINUTES = 120 * 2  # show an axis label every this many minutes
 # ---------------------------------------------
 
 CHART_TEMPLATE = Path(__file__).with_name("chart_template.html")
+SYMBOLS_DIR = Path(__file__).parent / "symbols"
+NAV_ARROW = (SYMBOLS_DIR / "arrowhead.svg").read_text(encoding="utf-8").strip()
+NAV_DOUBLE_ARROW = (SYMBOLS_DIR / "double_arrowhead.svg").read_text(encoding="utf-8").strip()
 MINUTES_PER_DAY = 24 * 60
 
 
@@ -99,8 +102,8 @@ def format_clock_label(minutes: int) -> str:
 
 
 def format_date_label(day: date) -> str:
-    """e.g. Sun, Aug 23, 2026."""
-    return day.strftime("%a, %b ") + str(day.day) + day.strftime(", %Y")
+    """e.g. SAT - 29 AUG 2026 (template uppercases)."""
+    return f"{day.strftime('%a')} - {day.day} {day.strftime('%b')} {day.year}"
 
 
 def resolve_chart_day(local_tz: str, on_date: date | None) -> date:
@@ -219,16 +222,24 @@ def render_chart_html(
         on_date, today=today, embed=embed
     )
     if next_href:
-        next_html = f'<a class="day-nav-next" href="{next_href}" aria-label="Next day">›</a>'
+        next_html = (
+            f'<a class="day-nav-next" href="{next_href}" aria-label="Next day">'
+            f"{NAV_ARROW}</a>"
+        )
     else:
-        next_html = '<span class="day-nav-next disabled" aria-disabled="true">›</span>'
+        next_html = (
+            '<span class="day-nav-next disabled" aria-disabled="true">'
+            f"{NAV_ARROW}</span>"
+        )
     if today_href:
         today_html = (
-            f'<a class="day-nav-today" href="{today_href}" aria-label="Today">»</a>'
+            f'<a class="day-nav-today" href="{today_href}" aria-label="Today">'
+            f"{NAV_DOUBLE_ARROW}</a>"
         )
     else:
         today_html = (
-            '<span class="day-nav-today disabled" aria-disabled="true">»</span>'
+            '<span class="day-nav-today disabled" aria-disabled="true">'
+            f"{NAV_DOUBLE_ARROW}</span>"
         )
 
     template = template_path.read_text(encoding="utf-8")
@@ -241,6 +252,7 @@ def render_chart_html(
         .replace("__AIRPORT_ICAO__", airport_icao)
         .replace("__DATE_LABEL__", date_label)
         .replace("__PREV_HREF__", prev_href)
+        .replace("__NAV_ARROW__", NAV_ARROW)
         .replace("__NEXT_HTML__", next_html)
         .replace("__TODAY_HTML__", today_html)
         .replace("__AXIS_LABELS_JSON__", json.dumps(series.axis_labels))
@@ -249,6 +261,13 @@ def render_chart_html(
         .replace("__TYPICAL_JSON__", json.dumps(series.typical_counts))
         .replace("__BAR_ROLES_JSON__", json.dumps(series.bar_roles))
     )
+
+
+def chart_heading(airport: Airport) -> str:
+    """Airfield-style label, e.g. TRAFFIC (VGT). US ICAO drops the leading K."""
+    icao = airport.icao
+    ident = icao[1:] if len(icao) == 4 and icao.startswith("K") else icao
+    return f"TRAFFIC ({ident})"
 
 
 def load_chart(
@@ -274,7 +293,7 @@ def chart_html(
     return render_chart_html(
         series,
         airport_icao=airport.icao,
-        chart_title=f"{airport.icao} Traffic",
+        chart_title=chart_heading(airport),
         on_date=day,
         local_tz=airport.timezone,
         refresh_seconds=refresh_seconds,
@@ -311,7 +330,7 @@ def write_chart_html(
     html = render_chart_html(
         series,
         airport_icao=airport.icao,
-        chart_title=f"{airport.icao} Traffic",
+        chart_title=chart_heading(airport),
         on_date=day,
         local_tz=airport.timezone,
         template_path=template_path,

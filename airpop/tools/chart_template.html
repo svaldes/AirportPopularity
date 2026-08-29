@@ -6,27 +6,30 @@
   <title>__CHART_TITLE__</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     /* --- Theme (tweak these) --- */
+    /* Default inks follow sectional-chart colors (IAC-2). Swap fonts here;
+       Chart.js ticks read --font. Oswald is a free stand-in for Alternate Gothic. */
     :root {
-      --font-display: "Barlow Condensed", sans-serif;
-      --font: "Source Sans 3", system-ui, sans-serif;
-      --ink: #d7ebe0;
-      --ink-muted: #7fa894;
-      --sky-top: #0a1612;
-      --sky-mid: #0d1c17;
-      --sky-bottom: #08110e;
-      --horizon: #1e4a38;
-      --bar-default: #2f8f6b;
-      --bar-current: #c6e85a;
-      --bar-typical: #1a3d30;
-      --bar-measured-opacity: 0.85;
-      --grid: rgba(127, 168, 148, 0.14);
-      --nav-link: var(--ink);
-      --nav-disabled: #3d5c4e;
-      --nav-hover: rgba(198, 232, 90, 0.12);
+      --font-display: Oswald, "Helvetica Neue Condensed", "Arial Narrow", sans-serif;
+      --font: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --ink: #2e2628;
+      --ink-muted: #275d8c;
+      --sky-top: #bed7e5;
+      --sky-mid: #bed7e5;
+      --sky-bottom: #bed7e5;
+      --horizon: #006ea1;
+      --bar-default: #1d6b8a;
+      --bar-current: #e07a2f;
+      --bar-typical: #1d6b8a;
+      --bar-measured-opacity: 1;
+      --bar-typical-opacity: 0.4;
+      --grid: rgba(0, 110, 161, 0.14);
+      --nav-link: var(--ink-muted);
+      --nav-hover: rgba(129, 59, 94, 0.12);
+      --nav-disabled-opacity: 0.4;
       --hit: 2.75rem;
     }
     /* ----------------------------------- */
@@ -36,9 +39,7 @@
       margin: 0;
       font-family: var(--font);
       color: var(--ink);
-      background:
-        radial-gradient(100% 50% at 50% -5%, rgba(47, 143, 107, 0.18), transparent 55%),
-        linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 42%, var(--sky-bottom) 100%);
+      background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 42%, var(--sky-bottom) 100%);
       min-height: 100dvh;
     }
     #wrap {
@@ -55,11 +56,13 @@
     h1 {
       margin: 0;
       font-family: var(--font-display);
-      font-weight: 800;
-      font-size: clamp(2.75rem, 14vw, 5.5rem);
-      line-height: 0.92;
-      letter-spacing: 0.02em;
+      font-weight: 600;
+      font-size: clamp(1.05rem, 3.8vw, 1.35rem);
+      line-height: 1.1;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
+      text-align: center;
+      color: var(--ink-muted);
       width: 100%;
     }
     .day-nav {
@@ -68,16 +71,25 @@
       align-items: center;
       gap: 0.35rem;
       width: 100%;
-      margin: clamp(0.85rem, 3vw, 1.35rem) 0 clamp(1rem, 3vw, 1.5rem);
-      padding: 0.35rem 0 0.85rem;
-      border-bottom: 2px solid color-mix(in srgb, var(--horizon) 55%, transparent);
+      flex-shrink: 0;
+      margin: 0.65rem 0 0;
+      padding: 0.55rem 0 0;
+      border-top: 2px solid color-mix(in srgb, var(--horizon) 55%, transparent);
       animation: mast-in 560ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
     }
     .day-nav-forward {
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      gap: 0.1rem;
+      gap: 0.35rem;
+    }
+    .day-nav svg {
+      height: 1.15rem;
+      width: auto;
+      display: block;
+    }
+    .day-nav-prev svg {
+      transform: scaleX(-1);
     }
     .day-nav a,
     .day-nav .disabled {
@@ -86,19 +98,16 @@
       justify-content: center;
       min-width: var(--hit);
       min-height: var(--hit);
-      font-family: var(--font-display);
-      font-size: 2rem;
-      font-weight: 600;
-      line-height: 1;
       text-decoration: none;
       color: var(--nav-link);
-      border-radius: 0.4rem;
+      border-radius: 0.35rem;
       transition: transform 120ms ease, background 120ms ease;
     }
     .day-nav a:active { transform: scale(0.92); }
     .day-nav a:hover { background: var(--nav-hover); }
     .day-nav .disabled {
-      color: var(--nav-disabled);
+      color: var(--ink-muted);
+      opacity: var(--nav-disabled-opacity);
       user-select: none;
     }
     .day-nav .date-label {
@@ -115,18 +124,11 @@
       text-overflow: ellipsis;
     }
     html.embed {
-      --hit: 2rem;
-    }
-    html.embed h1 {
-      font-size: clamp(1.15rem, 7vw, 1.75rem);
+      --hit: 2.5rem;
     }
     html.embed .day-nav {
-      margin: 0.35rem 0 0.5rem;
-      padding: 0.2rem 0 0.45rem;
-    }
-    html.embed .day-nav a,
-    html.embed .day-nav .disabled {
-      font-size: 1.25rem;
+      margin: 0.25rem 0 0;
+      padding: 0.2rem 0 0;
     }
     html.embed .day-nav .date-label {
       font-size: clamp(0.8rem, 3.8vw, 1.05rem);
@@ -182,18 +184,18 @@
   <div id="wrap">
     <header class="mast">
       <h1>__CHART_TITLE__</h1>
-      <nav class="day-nav" aria-label="Day">
-        <a class="day-nav-prev" href="__PREV_HREF__" aria-label="Previous day">‹</a>
-        <span class="date-label">__DATE_LABEL__</span>
-        <div class="day-nav-forward">
-          __NEXT_HTML__
-          __TODAY_HTML__
-        </div>
-      </nav>
     </header>
     <div class="chart-stage">
       <canvas id="chart" height="160"></canvas>
     </div>
+    <nav class="day-nav" aria-label="Day">
+      <a class="day-nav-prev" href="__PREV_HREF__" aria-label="Previous day">__NAV_ARROW__</a>
+      <span class="date-label">__DATE_LABEL__</span>
+      <div class="day-nav-forward">
+        __NEXT_HTML__
+        __TODAY_HTML__
+      </div>
+    </nav>
   </div>
   <script>
     const axisLabels = __AXIS_LABELS_JSON__;
@@ -220,8 +222,13 @@
       return color;
     };
     const measuredColors = barRoles.map((role) => withOpacity(barColor(role), measuredOpacity));
-    const typicalColor = css.getPropertyValue("--bar-typical").trim() || "#94a3b8";
-    const tickColor = css.getPropertyValue("--ink-muted").trim() || "#3d5c6a";
+    const typicalOpacity = css.getPropertyValue("--bar-typical-opacity").trim() || "0.45";
+    const typicalColor = withOpacity(
+      css.getPropertyValue("--bar-typical").trim() || "#fdf7dd",
+      typicalOpacity
+    );
+    const tickColor = css.getPropertyValue("--ink-muted").trim() || "#275d8c";
+    const tickFont = css.getPropertyValue("--font").trim() || "sans-serif";
     const chart = new Chart(document.getElementById("chart"), {
       type: "bar",
       data: {
@@ -280,7 +287,7 @@
               autoSkip: false,
               maxRotation: 0,
               color: tickColor,
-              font: { family: "'Source Sans 3', sans-serif", size: 11 },
+              font: { family: tickFont, size: 11 },
             },
           },
           y: {
@@ -288,7 +295,7 @@
             ticks: {
               precision: 0,
               color: tickColor,
-              font: { family: "'Source Sans 3', sans-serif", size: 11 },
+              font: { family: tickFont, size: 11 },
             },
             grid: { color: css.getPropertyValue("--grid").trim() },
           },
