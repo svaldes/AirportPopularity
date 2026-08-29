@@ -5,11 +5,9 @@ import time
 from datetime import datetime, timezone
 
 from airpop.airports import lookup_airport
+from airpop.config import POLL_INTERVAL_SEC
 from airpop.db import db_path_for, insert_poll_sample
 from airpop.sources import count_airborne, resolve_source_name
-
-# ~288 calls/day; fits OpenSky anonymous (~400/day) and ADSBX Community (~10k/month).
-POLL_INTERVAL_SEC = 5 * 60
 
 
 def run_collector(icao: str) -> None:

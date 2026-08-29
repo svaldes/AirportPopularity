@@ -5,11 +5,10 @@ import os
 import urllib.error
 import urllib.request
 
-# Match the old OpenSky ~0.05° bbox (~3 NM).
-DIST_NM = 3
+from airpop.config import DISK_NM
 
 
-def count_airborne(lat: float, lon: float, dist_nm: float = DIST_NM) -> int:
+def count_airborne(lat: float, lon: float, dist_nm: float = DISK_NM) -> int:
     """Return count of aircraft within dist_nm of (lat, lon), not on ground."""
     key = os.environ.get("ADSBX_RAPIDAPI_KEY", "").strip()
     host = os.environ.get("ADSBX_RAPIDAPI_HOST", "").strip()

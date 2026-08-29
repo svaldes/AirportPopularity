@@ -2,8 +2,7 @@
 
 from opensky_api import OpenSkyApi
 
-# Half-width of bounding box in degrees (~3 NM latitude)
-BBOX_DELTA_DEG = 0.05
+from airpop.config import BBOX_DELTA_DEG
 
 
 def bbox_from_center(

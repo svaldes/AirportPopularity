@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from airpop.collector import POLL_INTERVAL_SEC
+from airpop.config import POLL_INTERVAL_SEC
 from airpop.db import init_db
 
 SAMPLE_DB_PATH = Path("data") / "sample.db"

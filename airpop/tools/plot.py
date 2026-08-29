@@ -12,12 +12,13 @@ from typing import NamedTuple
 from zoneinfo import ZoneInfo
 
 from airpop.airports import Airport, lookup_airport
-from airpop.collector import POLL_INTERVAL_SEC
+from airpop.config import DISK_NM, POLL_INTERVAL_SEC
 
 # --- Plot parameters (forkers: tweak these) ---
 DATA_INTERVAL_MINUTES = 120  # bar width / bucket size; one chart point each
 LABEL_INTERVAL_MINUTES = 120 * 2  # show an axis label every this many minutes
 # Bar roles ("default" / "current"); colors live in chart_template.html
+REPO_URL = "https://github.com/svaldes/AirportPopularity"
 # ---------------------------------------------
 
 CHART_TEMPLATE = Path(__file__).with_name("chart_template.html")
@@ -99,6 +100,38 @@ def format_clock_label(minutes: int) -> str:
     if m:
         return f"{base}:{m:02d}{suffix}"
     return f"{base}{suffix}"
+
+
+def format_polled_ago(polled_at: datetime | None) -> str:
+    """e.g. Polled 3 min ago."""
+    if polled_at is None:
+        return "No samples yet."
+    if polled_at.tzinfo is None:
+        polled_at = polled_at.replace(tzinfo=timezone.utc)
+    secs = int((datetime.now(timezone.utc) - polled_at).total_seconds())
+    if secs < 0:
+        secs = 0
+    if secs < 60:
+        return "Polled just now."
+    mins = secs // 60
+    if mins < 60:
+        return f"Polled {mins} min ago."
+    hours = mins // 60
+    if hours < 48:
+        return f"Polled {hours} hr ago."
+    days = hours // 24
+    return f"Polled {days} d ago."
+
+
+def latest_polled_at(db_path: Path) -> datetime | None:
+    """Most recent poll_samples timestamp, or None if the table is empty."""
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT polled_at FROM poll_samples ORDER BY polled_at DESC LIMIT 1"
+        ).fetchone()
+    if not row:
+        return None
+    return parse_polled_at(row[0])
 
 
 def format_date_label(day: date) -> str:
@@ -215,6 +248,7 @@ def render_chart_html(
     refresh_seconds: int | None = None,
     embed: bool = False,
     template_path: Path = CHART_TEMPLATE,
+    updated_label: str = "",
 ) -> str:
     """Fill the chart template; optional live-server poll interval (seconds)."""
     today = datetime.now(ZoneInfo(local_tz)).date()
@@ -250,6 +284,9 @@ def render_chart_html(
         .replace("__POLL_SECONDS__", poll_seconds)
         .replace("__CHART_TITLE__", chart_title)
         .replace("__AIRPORT_ICAO__", airport_icao)
+        .replace("__DISK_NM__", str(DISK_NM))
+        .replace("__INFO_UPDATED__", updated_label)
+        .replace("__REPO_URL__", REPO_URL)
         .replace("__DATE_LABEL__", date_label)
         .replace("__PREV_HREF__", prev_href)
         .replace("__NAV_ARROW__", NAV_ARROW)
@@ -290,6 +327,7 @@ def chart_html(
 ) -> str:
     """Load series and render HTML (styling lives in the chart template)."""
     airport, day, series = load_chart(db_path, on_date=on_date)
+    updated = format_polled_ago(latest_polled_at(db_path))
     return render_chart_html(
         series,
         airport_icao=airport.icao,
@@ -299,6 +337,7 @@ def chart_html(
         refresh_seconds=refresh_seconds,
         embed=embed,
         template_path=template_path,
+        updated_label=updated,
     )
 
 
@@ -313,6 +352,7 @@ def chart_json(db_path: Path, *, on_date: date | None = None) -> str:
             "typical": series.typical_counts,
             "bar_roles": series.bar_roles,
             "date_label": format_date_label(day),
+            "updated_label": format_polled_ago(latest_polled_at(db_path)),
         }
     )
 
@@ -334,6 +374,7 @@ def write_chart_html(
         on_date=day,
         local_tz=airport.timezone,
         template_path=template_path,
+        updated_label=format_polled_ago(latest_polled_at(db_path)),
     )
     output_path.write_text(html, encoding="utf-8")
     return series

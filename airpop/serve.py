@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from airpop.airports import lookup_airport
-from airpop.collector import POLL_INTERVAL_SEC
+from airpop.config import POLL_INTERVAL_SEC
 from airpop.db import db_path_for
 from airpop.tools.plot import chart_html, chart_json
 
