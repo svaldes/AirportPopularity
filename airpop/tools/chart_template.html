@@ -14,19 +14,20 @@
     :root {
       --font-display: "Barlow Condensed", sans-serif;
       --font: "Source Sans 3", system-ui, sans-serif;
-      --ink: #0b2430;
-      --ink-muted: #3d5c6a;
-      --sky-top: #c5e4ef;
-      --sky-mid: #e7f3f7;
-      --sky-bottom: #f4f8fa;
-      --horizon: #7eb8c9;
-      --bar-default: #1d6b8a;
-      --bar-current: #e07a2f;
-      --bar-typical: #a8c5d0;
-      --bar-measured-opacity: 0.72;
-      --grid: rgba(11, 36, 48, 0.08);
+      --ink: #d7ebe0;
+      --ink-muted: #7fa894;
+      --sky-top: #0a1612;
+      --sky-mid: #0d1c17;
+      --sky-bottom: #08110e;
+      --horizon: #1e4a38;
+      --bar-default: #2f8f6b;
+      --bar-current: #c6e85a;
+      --bar-typical: #1a3d30;
+      --bar-measured-opacity: 0.85;
+      --grid: rgba(127, 168, 148, 0.14);
       --nav-link: var(--ink);
-      --nav-disabled: #9bb0ba;
+      --nav-disabled: #3d5c4e;
+      --nav-hover: rgba(198, 232, 90, 0.12);
       --hit: 2.75rem;
     }
     /* ----------------------------------- */
@@ -37,8 +38,8 @@
       font-family: var(--font);
       color: var(--ink);
       background:
-        radial-gradient(120% 60% at 50% -10%, rgba(255, 255, 255, 0.55), transparent 55%),
-        linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 38%, var(--sky-bottom) 100%);
+        radial-gradient(100% 50% at 50% -5%, rgba(47, 143, 107, 0.18), transparent 55%),
+        linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 42%, var(--sky-bottom) 100%);
       min-height: 100dvh;
     }
     #wrap {
@@ -96,7 +97,7 @@
       transition: transform 120ms ease, background 120ms ease;
     }
     .day-nav a:active { transform: scale(0.92); }
-    .day-nav a:hover { background: rgba(255, 255, 255, 0.35); }
+    .day-nav a:hover { background: var(--nav-hover); }
     .day-nav .disabled {
       color: var(--nav-disabled);
       user-select: none;
