@@ -25,8 +25,20 @@ def parse_on_date(query: dict[str, list[str]]) -> date | None:
         return None
 
 
+def parse_embed(query: dict[str, list[str]]) -> bool:
+    """True when ?embed=1 (compact mast for iframe hosts)."""
+    raw_list = query.get("embed")
+    if not raw_list:
+        return False
+    return raw_list[0].strip() == "1"
+
+
 def build_chart_page(
-    icao: str, *, refresh_seconds: int, on_date: date | None = None
+    icao: str,
+    *,
+    refresh_seconds: int,
+    on_date: date | None = None,
+    embed: bool = False,
 ) -> bytes:
     airport = lookup_airport(icao)
     db_path = db_path_for(airport.icao)
@@ -39,7 +51,10 @@ def build_chart_page(
         return body.encode("utf-8")
 
     return chart_html_for_db(
-        db_path, on_date=on_date, refresh_seconds=refresh_seconds
+        db_path,
+        on_date=on_date,
+        refresh_seconds=refresh_seconds,
+        embed=embed,
     ).encode("utf-8")
 
 
@@ -55,9 +70,14 @@ def make_handler(icao: str, refresh_seconds: int) -> type[BaseHTTPRequestHandler
             if path not in ("/", f"/{icao}", f"/{icao}/"):
                 self.send_error(404, "Not found - try /")
                 return
-            on_date = parse_on_date(parse_qs(parsed.query))
+            query = parse_qs(parsed.query)
+            on_date = parse_on_date(query)
+            embed = parse_embed(query)
             body = build_chart_page(
-                icao, refresh_seconds=refresh_seconds, on_date=on_date
+                icao,
+                refresh_seconds=refresh_seconds,
+                on_date=on_date,
+                embed=embed,
             )
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")

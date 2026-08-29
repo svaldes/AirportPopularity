@@ -110,17 +110,20 @@ def resolve_chart_day(local_tz: str, on_date: date | None) -> date:
     return today if day > today else day
 
 
-def day_nav_hrefs(day: date, *, today: date) -> tuple[str, str, str, str]:
+def day_nav_hrefs(
+    day: date, *, today: date, embed: bool = False
+) -> tuple[str, str, str, str]:
     """Return (prev_href, next_href, today_href, date_label).
 
     next_href / today_href are empty when day is already today.
     """
+    extra = "&embed=1" if embed else ""
     prev = day - timedelta(days=1)
-    prev_href = f"/?date={prev.isoformat()}"
-    today_href = f"/?date={today.isoformat()}"
+    prev_href = f"/?date={prev.isoformat()}{extra}"
+    today_href = f"/?date={today.isoformat()}{extra}"
     if day >= today:
         return prev_href, "", "", format_date_label(day)
-    next_href = f"/?date={(day + timedelta(days=1)).isoformat()}"
+    next_href = f"/?date={(day + timedelta(days=1)).isoformat()}{extra}"
     return prev_href, next_href, today_href, format_date_label(day)
 
 
@@ -207,11 +210,14 @@ def render_chart_html(
     on_date: date,
     local_tz: str,
     refresh_seconds: int | None = None,
+    embed: bool = False,
     template_path: Path = CHART_TEMPLATE,
 ) -> str:
     """Fill the chart template; optional browser refresh interval for the live server."""
     today = datetime.now(ZoneInfo(local_tz)).date()
-    prev_href, next_href, today_href, date_label = day_nav_hrefs(on_date, today=today)
+    prev_href, next_href, today_href, date_label = day_nav_hrefs(
+        on_date, today=today, embed=embed
+    )
     if next_href:
         next_html = f'<a class="day-nav-next" href="{next_href}" aria-label="Next day">›</a>'
     else:
@@ -231,8 +237,10 @@ def render_chart_html(
         else ""
     )
     template = template_path.read_text(encoding="utf-8")
+    html_class = ' class="embed"' if embed else ""
     return (
-        template.replace("__REFRESH_META__", refresh_meta)
+        template.replace("__HTML_CLASS__", html_class)
+        .replace("__REFRESH_META__", refresh_meta)
         .replace("__CHART_TITLE__", chart_title)
         .replace("__AIRPORT_ICAO__", airport_icao)
         .replace("__DATE_LABEL__", date_label)
@@ -252,6 +260,7 @@ def chart_html_for_db(
     *,
     on_date: date | None = None,
     refresh_seconds: int | None = None,
+    embed: bool = False,
     template_path: Path = CHART_TEMPLATE,
 ) -> str:
     """Load series and render HTML (styling lives in the chart template)."""
@@ -265,6 +274,7 @@ def chart_html_for_db(
         on_date=day,
         local_tz=airport.timezone,
         refresh_seconds=refresh_seconds,
+        embed=embed,
         template_path=template_path,
     )
 
