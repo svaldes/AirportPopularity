@@ -16,6 +16,14 @@ From repo root (`AIRPOP_SOURCE` required):
 
 Airports: `airports.json`.
 
+## Embed
+
+Iframe the live chart with `?embed=1`:
+
+```html
+<iframe src="https://your-host/?embed=1" title="KVGT traffic"></iframe>
+```
+
 ## Data sources
 
 | `AIRPOP_SOURCE` | Notes |
