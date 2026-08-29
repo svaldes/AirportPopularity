@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 
-CountFn = Callable[[float, float], int]
+CountFn = Callable[..., int]
 
 
 def resolve_source_name() -> str:
@@ -18,7 +18,7 @@ def resolve_source_name() -> str:
 
 
 def get_count_airborne() -> CountFn:
-    """Return the count_airborne(lat, lon) implementation for AIRPOP_SOURCE."""
+    """Return the count_airborne(lat, lon, *, max_msl_ft) for AIRPOP_SOURCE."""
     name = resolve_source_name()
     if name == "opensky":
         from airpop.sources.opensky import count_airborne
@@ -35,6 +35,6 @@ def get_count_airborne() -> CountFn:
     )
 
 
-def count_airborne(lat: float, lon: float) -> int:
-    """Count airborne aircraft near (lat, lon) using AIRPOP_SOURCE."""
-    return get_count_airborne()(lat, lon)
+def count_airborne(lat: float, lon: float, *, max_msl_ft: float) -> int:
+    """Count aircraft near (lat, lon) at or below max_msl_ft (AIRPOP_SOURCE)."""
+    return get_count_airborne()(lat, lon, max_msl_ft=max_msl_ft)

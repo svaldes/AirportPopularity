@@ -3,18 +3,21 @@
     "name": "North Las Vegas",
     "lat": 36.2107,
     "lon": -115.1944,
+    "elevation_ft": 2205,
     "timezone": "America/Los_Angeles"
   },
   "KPAO": {
     "name": "Palo Alto",
     "lat": 37.4611,
     "lon": -122.115,
+    "elevation_ft": 7,
     "timezone": "America/Los_Angeles"
   },
   "KVNY": {
     "name": "Van Nuys",
     "lat": 34.2098,
     "lon": -118.49,
+    "elevation_ft": 802,
     "timezone": "America/Los_Angeles"
   }
 }

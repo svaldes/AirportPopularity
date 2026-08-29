@@ -12,7 +12,7 @@ from typing import NamedTuple
 from zoneinfo import ZoneInfo
 
 from airpop.airports import Airport, lookup_airport
-from airpop.config import DISK_NM, POLL_INTERVAL_SEC
+from airpop.config import DISK_NM, POLL_INTERVAL_SEC, ceiling_msl_ft
 
 # --- Plot parameters (forkers: tweak these) ---
 DATA_INTERVAL_MINUTES = 120  # bar width / bucket size; one chart point each
@@ -249,6 +249,7 @@ def render_chart_html(
     embed: bool = False,
     template_path: Path = CHART_TEMPLATE,
     updated_label: str = "",
+    ceiling_msl: int = 0,
 ) -> str:
     """Fill the chart template; optional live-server poll interval (seconds)."""
     today = datetime.now(ZoneInfo(local_tz)).date()
@@ -285,6 +286,7 @@ def render_chart_html(
         .replace("__CHART_TITLE__", chart_title)
         .replace("__AIRPORT_ICAO__", airport_icao)
         .replace("__DISK_NM__", str(DISK_NM))
+        .replace("__CEILING_MSL_FT__", str(ceiling_msl))
         .replace("__INFO_UPDATED__", updated_label)
         .replace("__REPO_URL__", REPO_URL)
         .replace("__DATE_LABEL__", date_label)
@@ -338,6 +340,7 @@ def chart_html(
         embed=embed,
         template_path=template_path,
         updated_label=updated,
+        ceiling_msl=ceiling_msl_ft(airport.elevation_ft),
     )
 
 
@@ -375,6 +378,7 @@ def write_chart_html(
         local_tz=airport.timezone,
         template_path=template_path,
         updated_label=format_polled_ago(latest_polled_at(db_path)),
+        ceiling_msl=ceiling_msl_ft(airport.elevation_ft),
     )
     output_path.write_text(html, encoding="utf-8")
     return series

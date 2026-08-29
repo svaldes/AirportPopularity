@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timezone
 
 from airpop.airports import lookup_airport
-from airpop.config import POLL_INTERVAL_SEC
+from airpop.config import POLL_INTERVAL_SEC, ceiling_msl_ft
 from airpop.db import db_path_for, insert_poll_sample
 from airpop.sources import count_airborne, resolve_source_name
 
@@ -18,7 +18,11 @@ def run_collector(icao: str) -> None:
     while True:
         ts = datetime.now(timezone.utc).isoformat()
         try:
-            n = count_airborne(airport.lat, airport.lon)
+            n = count_airborne(
+                airport.lat,
+                airport.lon,
+                max_msl_ft=ceiling_msl_ft(airport.elevation_ft),
+            )
             insert_poll_sample(n, path=path)
             print(f"{ts}  count={n}  saved")
         except RuntimeError as e:

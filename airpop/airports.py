@@ -12,6 +12,7 @@ class Airport(NamedTuple):
     name: str
     lat: float
     lon: float
+    elevation_ft: int  # surveyed field elevation, MSL
     timezone: str  # IANA name, e.g. America/Los_Angeles (handles DST)
 
 
@@ -34,5 +35,6 @@ def lookup_airport(icao: str) -> Airport:
         name=str(entry["name"]),
         lat=float(entry["lat"]),
         lon=float(entry["lon"]),
+        elevation_ft=int(entry["elevation_ft"]),
         timezone=str(entry["timezone"]),
     )

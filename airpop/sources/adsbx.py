@@ -8,8 +8,10 @@ import urllib.request
 from airpop.config import DISK_NM
 
 
-def count_airborne(lat: float, lon: float, dist_nm: float = DISK_NM) -> int:
-    """Return count of aircraft within dist_nm of (lat, lon), not on ground."""
+def count_airborne(
+    lat: float, lon: float, *, max_msl_ft: float, dist_nm: float = DISK_NM
+) -> int:
+    """Count aircraft within dist_nm at or below max_msl_ft, not on ground."""
     key = os.environ.get("ADSBX_RAPIDAPI_KEY", "").strip()
     host = os.environ.get("ADSBX_RAPIDAPI_HOST", "").strip()
     if not key or not host:
@@ -42,6 +44,12 @@ def count_airborne(lat: float, lon: float, dist_nm: float = DISK_NM) -> int:
             continue
         # ADSBX uses the string "ground" for on-ground targets.
         if ac.get("alt_baro") == "ground":
+            continue
+        try:
+            alt_ft = float(ac.get("alt_baro"))
+        except (TypeError, ValueError):
+            continue
+        if alt_ft > max_msl_ft:
             continue
         count += 1
     return count
