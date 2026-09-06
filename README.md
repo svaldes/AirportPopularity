@@ -1,18 +1,21 @@
 # Airport Popularity
 
-Estimate how busy a small airport’s airspace is over time using ADS-B data. 
+### Welcome! 🙋🏻‍♀️
+This repo contains code for a widget that shows traffic levels at a small airport. It can be configured for different airports and different ADS-B sources. It can be run locally on your laptop or  [deployed](deploy/README.md).
 
 ## Run locally
 
 From repo root (`AIRPOP_SOURCE` required):
 
-| Command | What it does |
-|---------|----------------|
-| `uv run poll KVGT` | One-shot aircraft count |
-| `uv run collect KVGT` | Poll every 5 min → `data/KVGT.db` |
-| `uv run serve KVGT` | Chart at http://127.0.0.1:8000/ |
-| `uv run sample` | Fake data → `data/sample.db` |
-| `uv run chart data/KVGT.db` | Static HTML snapshot |
+
+| Command                     | What it does                                              |
+| --------------------------- | --------------------------------------------------------- |
+| `uv run poll KVGT`          | One-shot aircraft count                                   |
+| `uv run collect KVGT`       | Poll every 5 min → `data/KVGT.db`                         |
+| `uv run serve KVGT`         | Chart at [http://127.0.0.1:8000/](http://127.0.0.1:8000/) |
+| `uv run sample`             | Fake data → `data/sample.db`                              |
+| `uv run chart data/KVGT.db` | Static HTML snapshot                                      |
+
 
 Airports: `airports.json`.
 
@@ -24,13 +27,17 @@ Iframe the live chart with `?embed=1`:
 <iframe src="https://your-host/?embed=1" title="KVGT traffic"></iframe>
 ```
 
+
+
 ## Data sources
 
-| `AIRPOP_SOURCE` | Notes |
-|-----------------|--------|
-| `opensky` | Free, non-commercial; often blocked from hyperscaler IPs |
-| `adsbx` | RapidAPI key (`ADSBX_RAPIDAPI_KEY`, `ADSBX_RAPIDAPI_HOST`) |
-| `local` | Own receiver — planned |
+
+| `AIRPOP_SOURCE` | Notes                                                      |
+| --------------- | ---------------------------------------------------------- |
+| `opensky`       | Free, non-commercial; often blocked from hyperscaler IPs   |
+| `adsbx`         | RapidAPI key (`ADSBX_RAPIDAPI_KEY`, `ADSBX_RAPIDAPI_HOST`) |
+| `local`         | Own receiver — planned                                     |
+
 
 Each deployer runs their own collector with their own credentials.
 
