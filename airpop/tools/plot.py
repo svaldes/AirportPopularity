@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 from airpop.airports import Airport, lookup_airport
 from airpop.config import DISK_NM, POLL_INTERVAL_SEC, ceiling_msl_ft
+from airpop.db import ensure_schema
 
 # --- Plot parameters (forkers: tweak these) ---
 DATA_INTERVAL_MINUTES = 120  # bar width / bucket size; one chart point each
@@ -187,8 +188,9 @@ def load_series(
     now_slot = floor_to_slot_minutes(now_local, slot_mins)
 
     with sqlite3.connect(db_path) as conn:
+        ensure_schema(conn)
         rows = conn.execute(
-            "SELECT polled_at, count FROM poll_samples ORDER BY polled_at"
+            "SELECT polled_at, in_air FROM poll_samples ORDER BY polled_at"
         ).fetchall()
 
     # (date, slot_start_minutes) -> sample counts in that local bucket

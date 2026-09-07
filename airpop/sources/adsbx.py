@@ -1,4 +1,4 @@
-"""ADS-B Exchange Community API (RapidAPI): count airborne aircraft in an NM radius."""
+"""ADS-B Exchange Community API (RapidAPI): count aircraft in an NM radius."""
 
 import json
 import os
@@ -8,10 +8,10 @@ import urllib.request
 from airpop.config import DISK_NM
 
 
-def count_airborne(
+def count_in_volume(
     lat: float, lon: float, *, max_msl_ft: float, dist_nm: float = DISK_NM
-) -> int:
-    """Count aircraft within dist_nm at or below max_msl_ft, not on ground."""
+) -> tuple[int, int]:
+    """Count airborne (at or below max_msl_ft) and on-ground aircraft within dist_nm."""
     key = os.environ.get("ADSBX_RAPIDAPI_KEY", "").strip()
     host = os.environ.get("ADSBX_RAPIDAPI_HOST", "").strip()
     if not key or not host:
@@ -38,12 +38,14 @@ def count_airborne(
         raise RuntimeError(f"ADS-B Exchange request failed: {e}") from e
 
     aircraft = payload.get("ac") or []
-    count = 0
+    airborne = 0
+    on_ground = 0
     for ac in aircraft:
         if ac.get("lat") is None or ac.get("lon") is None:
             continue
         # ADSBX uses the string "ground" for on-ground targets.
         if ac.get("alt_baro") == "ground":
+            on_ground += 1
             continue
         try:
             alt_ft = float(ac.get("alt_baro"))
@@ -51,5 +53,5 @@ def count_airborne(
             continue
         if alt_ft > max_msl_ft:
             continue
-        count += 1
-    return count
+        airborne += 1
+    return airborne, on_ground

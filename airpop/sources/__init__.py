@@ -5,7 +5,8 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 
-CountFn = Callable[..., int]
+# (airborne, on_ground) from one source fetch
+CountFn = Callable[..., tuple[int, int]]
 
 
 def resolve_source_name() -> str:
@@ -17,17 +18,17 @@ def resolve_source_name() -> str:
     return raw.strip().lower()
 
 
-def get_count_airborne() -> CountFn:
-    """Return the count_airborne(lat, lon, *, max_msl_ft) for AIRPOP_SOURCE."""
+def get_count_in_volume() -> CountFn:
+    """Return count_in_volume(lat, lon, *, max_msl_ft) for AIRPOP_SOURCE."""
     name = resolve_source_name()
     if name == "opensky":
-        from airpop.sources.opensky import count_airborne
+        from airpop.sources.opensky import count_in_volume
 
-        return count_airborne
+        return count_in_volume
     if name == "adsbx":
-        from airpop.sources.adsbx import count_airborne
+        from airpop.sources.adsbx import count_in_volume
 
-        return count_airborne
+        return count_in_volume
     if name == "local":
         raise RuntimeError("AIRPOP_SOURCE=local is not implemented yet")
     raise RuntimeError(
@@ -35,6 +36,6 @@ def get_count_airborne() -> CountFn:
     )
 
 
-def count_airborne(lat: float, lon: float, *, max_msl_ft: float) -> int:
-    """Count aircraft near (lat, lon) at or below max_msl_ft (AIRPOP_SOURCE)."""
-    return get_count_airborne()(lat, lon, max_msl_ft=max_msl_ft)
+def count_in_volume(lat: float, lon: float, *, max_msl_ft: float) -> tuple[int, int]:
+    """Airborne and on-ground counts in the source volume (AIRPOP_SOURCE)."""
+    return get_count_in_volume()(lat, lon, max_msl_ft=max_msl_ft)
