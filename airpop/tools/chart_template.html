@@ -339,7 +339,7 @@
                 const y = ctx.parsed.y;
                 if (y == null) return null;
                 if (ctx.dataset.label === "Typical") {
-                  return `Typical: ${Number.isInteger(y) ? y : y.toFixed(1)}`;
+                  return `Typical: ${Math.round(y)}`;
                 }
                 return `Count: ${y}`;
               },
