@@ -48,3 +48,12 @@ sudo certbot --nginx -d airpop.example.com
 ```
 
 Certbot rewrites the nginx site for TLS termination and renews via systemd timer.
+
+
+## Embed
+
+Iframe the live chart with `?embed=1`:
+
+```html
+<iframe src="https://your-host/?embed=1" title="KVGT traffic"></iframe>
+```

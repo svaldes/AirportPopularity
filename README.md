@@ -1,43 +1,77 @@
 # Airport Popularity
 
-Estimate how busy a small airport’s airspace is over time using ADS-B data. 
+### Welcome! 🙋🏻‍♀️
+This repo contains code for a widget that shows traffic levels at a small airport. It can be configured for different airports and ADS-B sources. It can be run locally on your laptop or  [deployed](deploy/README.md).
 
-## Run locally
+## Quick Setup
 
-From repo root (`AIRPOP_SOURCE` required):
+### 0. Prerequisites 
 
-| Command | What it does |
-|---------|----------------|
-| `uv run poll KVGT` | One-shot aircraft count |
-| `uv run collect KVGT` | Poll every 5 min → `data/KVGT.db` |
-| `uv run serve KVGT` | Chart at http://127.0.0.1:8000/ |
-| `uv run sample` | Fake data → `data/sample.db` |
-| `uv run chart data/KVGT.db` | Static HTML snapshot |
+- git
+- Python 3.10–3.13
+- [uv](https://docs.astral.sh/uv/)
 
-Airports: `airports.json`.
+### 1. Install
 
-## Embed
-
-Iframe the live chart with `?embed=1`:
-
-```html
-<iframe src="https://your-host/?embed=1" title="KVGT traffic"></iframe>
+```bash
+git clone https://github.com/svaldes/AirportPopularity.git
+cd AirportPopularity
+uv sync   # create .venv and install this project + dependencies
 ```
 
+### 2. Start Data Collection
+
+```bash
+export AIRPOP_SOURCE=opensky  # See Data Sources below
+uv run collect KVGT
+```
+### 3. Display Chart
+
+Leave the collector running. In a separate terminal,
+```bash
+uv run serve KVGT
+```
+The live data will be served at [http://localhost:8000/](http://localhost:8000/)
+
+## How it Works
+
+```mermaid
+flowchart LR
+  collector["collect"] --> db["data/ICAO.db"]
+  db --> server["serve"]
+```
+
+The `collect` process writes traffic counts to a local database every 5 minuntes. `serve` reads the same file and serves the chart.
+
+## Airports
+
+To collect data on a different airport, add an entry to [airports.json](airports.json):
+```
+"KVNY": {
+    "name": "Van Nuys",
+    "lat": 34.2098,
+    "lon": -118.49,
+    "elevation_ft": 802,
+    "timezone": "America/Los_Angeles"
+  }
+```
+
+
 ## Data sources
+ADS-B can be collected from one of several sources. OpenSky is free and requires no set-up, so it's a good starting point.
 
-| `AIRPOP_SOURCE` | Notes |
-|-----------------|--------|
-| `opensky` | Free, non-commercial; often blocked from hyperscaler IPs |
-| `adsbx` | RapidAPI key (`ADSBX_RAPIDAPI_KEY`, `ADSBX_RAPIDAPI_HOST`) |
-| `local` | Own receiver — planned |
+| `AIRPOP_SOURCE` | Notes                                                      |
+| --------------- | ---------------------------------------------------------- |
+| `opensky`       | Free, non-commercial; often blocked from hyperscaler IPs   |
+| `adsbx`         | RapidAPI key (`ADSBX_RAPIDAPI_KEY`, `ADSBX_RAPIDAPI_HOST`) |
+| `local`         | Own receiver — coming soon                                     |
 
-Each deployer runs their own collector with their own credentials.
+### Terms
+
+[OpenSky](https://opensky-network.org/about/terms-of-use) · [ADS-B Exchange AUP](https://www.adsbexchange.com/acceptable-use-policy/)
+
 
 ## Deploy
 
-VPS setup: **[deploy/README.md](deploy/README.md)**.
+A public chart needs the collector running continuously (i.e. not on your laptop). To run the collector and server on a VPS, see **[deploy/README.md](deploy/README.md)**.
 
-## Terms
-
-[OpenSky](https://opensky-network.org/about/terms-of-use) · [ADS-B Exchange AUP](https://www.adsbexchange.com/acceptable-use-policy/)
