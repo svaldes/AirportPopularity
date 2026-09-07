@@ -269,7 +269,7 @@
     const barRoles = __BAR_ROLES_JSON__;
     const pollSeconds = __POLL_SECONDS__;
     const css = getComputedStyle(document.documentElement);
-    const measuredOpacity = css.getPropertyValue("--bar-measured-opacity").trim() || "0.7";
+    const measuredOpacity = css.getPropertyValue("--bar-measured-opacity").trim() || "1";
     const barColor = (role) =>
       css.getPropertyValue(`--bar-${role}`).trim() || css.getPropertyValue("--bar-default").trim();
     const withOpacity = (color, opacity) => {
@@ -304,8 +304,8 @@
             backgroundColor: typicalColor,
             borderWidth: 0,
             borderRadius: 4,
-            barPercentage: 0.85,
-            categoryPercentage: 0.9,
+            barPercentage: 1,
+            categoryPercentage: 1,
             minBarLength: 3,
             order: 2,
           },
