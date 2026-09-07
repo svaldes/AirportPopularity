@@ -58,8 +58,10 @@ def aggregate_typical_mean(values: list[int]) -> float:
 class ChartSeries(NamedTuple):
     axis_labels: list[str]
     hour_labels: list[str]
-    peak_counts: list[int | None]  # measured peak traffic count; None if no samples
-    typical_counts: list[float | None]  # same-weekday typical; None if no history
+    peak_counts_in_air: list[int | None]
+    typical_counts_in_air: list[float | None]
+    peak_counts_all: list[int | None]
+    typical_counts_all: list[float | None]
     bar_roles: list[str]  # e.g. "default" or "current" — styled in the template
 
 
@@ -148,13 +150,21 @@ def resolve_chart_day(local_tz: str, on_date: date | None) -> date:
 
 
 def day_nav_hrefs(
-    day: date, *, today: date, embed: bool = False
+    day: date,
+    *,
+    today: date,
+    embed: bool = False,
+    filter_on_ground: bool = True,
 ) -> tuple[str, str, str, str]:
     """Return (prev_href, next_href, today_href, date_label).
 
     next_href / today_href are empty when day is already today.
     """
-    extra = "&embed=1" if embed else ""
+    extra = ""
+    if embed:
+        extra += "&embed=1"
+    if not filter_on_ground:
+        extra += "&all=1"
     prev = day - timedelta(days=1)
     prev_href = f"/?date={prev.isoformat()}{extra}"
     today_href = f"/?date={today.isoformat()}{extra}"
@@ -170,6 +180,41 @@ def format_slot_window(start_minutes: int, slot_mins: int) -> str:
         f"{format_clock_label(start_minutes)}-"
         f"{format_clock_label(start_minutes + slot_mins)}"
     )
+
+
+def _slot_peaks_and_typical(
+    buckets: dict[tuple[date, int], list[int]],
+    *,
+    day: date,
+    weekday: int,
+    viewing_today: bool,
+    now_slot: int,
+    expected: int,
+    slot_mins: int,
+    aggregate_typical: TypicalAggregator,
+) -> tuple[list[int | None], list[float | None]]:
+    """Peak per slot plus same-weekday typical (complete slots only)."""
+    slot_peak: dict[tuple[date, int], int] = {
+        key: max(samples)
+        for key, samples in buckets.items()
+        if len(samples) >= expected
+    }
+    peaks: list[int | None] = []
+    typicals: list[float | None] = []
+    for start in range(0, MINUTES_PER_DAY, slot_mins):
+        is_current = viewing_today and start == now_slot
+        peak = slot_peak.get((day, start))
+        if peak is None and is_current:
+            live = buckets.get((day, start), [])
+            peak = max(live) if live else 0
+        peaks.append(peak)
+        same_dow = [
+            p
+            for (d, slot), p in slot_peak.items()
+            if slot == start and d.weekday() == weekday
+        ]
+        typicals.append(aggregate_typical(same_dow) if same_dow else None)
+    return peaks, typicals
 
 
 def load_series(
@@ -190,53 +235,57 @@ def load_series(
     with sqlite3.connect(db_path) as conn:
         ensure_schema(conn)
         rows = conn.execute(
-            "SELECT polled_at, in_air FROM poll_samples ORDER BY polled_at"
+            "SELECT polled_at, in_air, on_ground FROM poll_samples ORDER BY polled_at"
         ).fetchall()
 
-    # (date, slot_start_minutes) -> sample counts in that local bucket
-    buckets: dict[tuple[date, int], list[int]] = defaultdict(list)
-    for polled_at, count in rows:
+    in_air_buckets: dict[tuple[date, int], list[int]] = defaultdict(list)
+    all_buckets: dict[tuple[date, int], list[int]] = defaultdict(list)
+    for polled_at, in_air, on_ground in rows:
         local = parse_polled_at(polled_at).astimezone(tz)
         slot = floor_to_slot_minutes(local, slot_mins)
-        buckets[(local.date(), slot)].append(count)
+        key = (local.date(), slot)
+        ground = 0 if on_ground is None else on_ground
+        in_air_buckets[key].append(in_air)
+        all_buckets[key].append(in_air + ground)
 
     expected = expected_samples_per_slot(slot_mins)
-    # Complete slots only — feed measured history and typical.
-    slot_peak: dict[tuple[date, int], int] = {
-        key: max(samples)
-        for key, samples in buckets.items()
-        if len(samples) >= expected
-    }
-
     weekday = day.weekday()
     viewing_today = day == now_local.date()
+    slot_kwargs = dict(
+        day=day,
+        weekday=weekday,
+        viewing_today=viewing_today,
+        now_slot=now_slot,
+        expected=expected,
+        slot_mins=slot_mins,
+        aggregate_typical=aggregate_typical,
+    )
+    peak_counts_in_air, typical_counts_in_air = _slot_peaks_and_typical(
+        in_air_buckets, **slot_kwargs
+    )
+    peak_counts_all, typical_counts_all = _slot_peaks_and_typical(
+        all_buckets, **slot_kwargs
+    )
+
     axis_labels: list[str] = []
     hour_labels: list[str] = []
-    peak_counts: list[int | None] = []
-    typical_counts: list[float | None] = []
     bar_roles: list[str] = []
     for start in range(0, MINUTES_PER_DAY, slot_mins):
-        is_current = viewing_today and start == now_slot
-        peak = slot_peak.get((day, start))
-        if peak is None and is_current:
-            live = buckets.get((day, start), [])
-            peak = max(live) if live else 0
-        peak_counts.append(peak)
-        same_dow_peaks = [
-            peak
-            for (d, slot), peak in slot_peak.items()
-            if slot == start and d.weekday() == weekday
-        ]
-        typical_counts.append(
-            aggregate_typical(same_dow_peaks) if same_dow_peaks else None
-        )
         hour_labels.append(format_slot_window(start, slot_mins))
         axis_labels.append(
             format_clock_label(start) if start % label_every_mins == 0 else ""
         )
-        bar_roles.append("current" if is_current else "default")
+        bar_roles.append(
+            "current" if viewing_today and start == now_slot else "default"
+        )
     return ChartSeries(
-        axis_labels, hour_labels, peak_counts, typical_counts, bar_roles
+        axis_labels,
+        hour_labels,
+        peak_counts_in_air,
+        typical_counts_in_air,
+        peak_counts_all,
+        typical_counts_all,
+        bar_roles,
     )
 
 
@@ -249,6 +298,7 @@ def render_chart_html(
     local_tz: str,
     refresh_seconds: int | None = None,
     embed: bool = False,
+    filter_on_ground: bool = True,
     template_path: Path = CHART_TEMPLATE,
     updated_label: str = "",
     ceiling_msl: int = 0,
@@ -256,7 +306,7 @@ def render_chart_html(
     """Fill the chart template; optional live-server poll interval (seconds)."""
     today = datetime.now(ZoneInfo(local_tz)).date()
     prev_href, next_href, today_href, date_label = day_nav_hrefs(
-        on_date, today=today, embed=embed
+        on_date, today=today, embed=embed, filter_on_ground=filter_on_ground
     )
     if next_href:
         next_html = (
@@ -298,9 +348,13 @@ def render_chart_html(
         .replace("__TODAY_HTML__", today_html)
         .replace("__AXIS_LABELS_JSON__", json.dumps(series.axis_labels))
         .replace("__HOUR_LABELS_JSON__", json.dumps(series.hour_labels))
-        .replace("__COUNTS_JSON__", json.dumps(series.peak_counts))
-        .replace("__TYPICAL_JSON__", json.dumps(series.typical_counts))
+        .replace("__PEAK_COUNTS_IN_AIR_JSON__", json.dumps(series.peak_counts_in_air))
+        .replace("__TYPICAL_COUNTS_IN_AIR_JSON__", json.dumps(series.typical_counts_in_air))
+        .replace("__PEAK_COUNTS_ALL_JSON__", json.dumps(series.peak_counts_all))
+        .replace("__TYPICAL_COUNTS_ALL_JSON__", json.dumps(series.typical_counts_all))
         .replace("__BAR_ROLES_JSON__", json.dumps(series.bar_roles))
+        .replace("__SCOPE_IN_AIR__", "true" if filter_on_ground else "false")
+        .replace("__SCOPE_ALL__", "false" if filter_on_ground else "true")
     )
 
 
@@ -327,6 +381,7 @@ def chart_html(
     on_date: date | None = None,
     refresh_seconds: int | None = None,
     embed: bool = False,
+    filter_on_ground: bool = True,
     template_path: Path = CHART_TEMPLATE,
 ) -> str:
     """Load series and render HTML (styling lives in the chart template)."""
@@ -340,6 +395,7 @@ def chart_html(
         local_tz=airport.timezone,
         refresh_seconds=refresh_seconds,
         embed=embed,
+        filter_on_ground=filter_on_ground,
         template_path=template_path,
         updated_label=updated,
         ceiling_msl=ceiling_msl_ft(airport.elevation_ft),
@@ -353,8 +409,10 @@ def chart_json(db_path: Path, *, on_date: date | None = None) -> str:
         {
             "axis_labels": series.axis_labels,
             "hour_labels": series.hour_labels,
-            "counts": series.peak_counts,
-            "typical": series.typical_counts,
+            "peak_counts_in_air": series.peak_counts_in_air,
+            "typical_counts_in_air": series.typical_counts_in_air,
+            "peak_counts_all": series.peak_counts_all,
+            "typical_counts_all": series.typical_counts_all,
             "bar_roles": series.bar_roles,
             "date_label": format_date_label(day),
             "updated_label": format_polled_ago(latest_polled_at(db_path)),
@@ -395,7 +453,7 @@ def main() -> None:
 
     output_path = html_path(args.db)
     series = write_chart_html(args.db, output_path=output_path)
-    points = sum(1 for c in series.peak_counts if c is not None)
+    points = sum(1 for c in series.peak_counts_in_air if c is not None)
     print(f"wrote {output_path} ({points} slots with data)")
     print(f"open {output_path.resolve()}")
 
