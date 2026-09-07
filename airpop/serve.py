@@ -33,6 +33,14 @@ def parse_embed(query: dict[str, list[str]]) -> bool:
     return raw_list[0].strip() == "1"
 
 
+def parse_filter_on_ground(query: dict[str, list[str]]) -> bool:
+    """False when ?all=1 (keep on-ground in the count). Default True."""
+    raw_list = query.get("all")
+    if raw_list and raw_list[0].strip() == "1":
+        return False
+    return True
+
+
 def parse_poll(query: dict[str, list[str]]) -> bool:
     """True when ?poll=1 (series payload for in-page polling)."""
     raw_list = query.get("poll")
@@ -47,6 +55,7 @@ def build_chart_page(
     refresh_seconds: int,
     on_date: date | None = None,
     embed: bool = False,
+    filter_on_ground: bool = True,
 ) -> bytes:
     airport = lookup_airport(icao)
     db_path = db_path_for(airport.icao)
@@ -63,6 +72,7 @@ def build_chart_page(
         on_date=on_date,
         refresh_seconds=refresh_seconds,
         embed=embed,
+        filter_on_ground=filter_on_ground,
     ).encode("utf-8")
 
 
@@ -81,6 +91,7 @@ def make_handler(icao: str, refresh_seconds: int) -> type[BaseHTTPRequestHandler
             query = parse_qs(parsed.query)
             on_date = parse_on_date(query)
             embed = parse_embed(query)
+            filter_on_ground = parse_filter_on_ground(query)
             if parse_poll(query):
                 airport = lookup_airport(icao)
                 db_path = db_path_for(airport.icao)
@@ -99,6 +110,7 @@ def make_handler(icao: str, refresh_seconds: int) -> type[BaseHTTPRequestHandler
                 refresh_seconds=refresh_seconds,
                 on_date=on_date,
                 embed=embed,
+                filter_on_ground=filter_on_ground,
             )
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")

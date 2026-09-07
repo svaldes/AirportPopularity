@@ -66,11 +66,18 @@
       text-align: center;
       color: var(--ink-muted);
       width: 100%;
+      padding-inline-end: 7.5rem;
     }
-    .info-btn {
+    .mast-tools {
       position: absolute;
       top: 0;
       right: 0;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .info-btn {
       width: 1.15rem;
       height: 1.15rem;
       padding: 0;
@@ -83,6 +90,7 @@
       font-weight: 600;
       line-height: 1;
       cursor: pointer;
+      flex-shrink: 0;
     }
     .info-tip {
       position: absolute;
@@ -120,6 +128,28 @@
     }
     .info-tip a {
       color: var(--ink-muted);
+    }
+    .scope-toggle [role="radiogroup"] {
+      display: inline-flex;
+      border: 1.5px solid var(--horizon);
+      border-radius: 0.35rem;
+      overflow: hidden;
+    }
+    .scope-toggle button {
+      appearance: none;
+      margin: 0;
+      border: 0;
+      background: transparent;
+      color: var(--ink-muted);
+      font-family: var(--font);
+      font-size: 0.68rem;
+      line-height: 1;
+      padding: 0.22rem 0.5rem;
+      cursor: pointer;
+    }
+    .scope-toggle button[aria-checked="true"] {
+      background: var(--horizon);
+      color: #f4f8fa;
     }
     .day-nav {
       display: grid;
@@ -242,14 +272,22 @@
   <div id="wrap">
     <header class="mast">
       <h1>__CHART_TITLE__</h1>
-      <button type="button" class="info-btn" aria-label="About this chart" aria-expanded="false" aria-controls="chart-info-tip">i</button>
-      <p class="info-tip" id="chart-info-tip" role="tooltip">
-        <span class="info-updated">__INFO_UPDATED__</span><br>
-        ADS-B traffic w/in __DISK_NM__NM, below __CEILING_MSL_FT__MSL.<br>
-        Count: peak within __SLOT_PERIOD__ period.<br>
-        Typical: mean of same-weekday peaks.<br>
-        <a href="__REPO_URL__" target="_blank" rel="noopener noreferrer">Contribute</a>
-      </p>
+      <div class="mast-tools">
+        <div class="scope-toggle">
+          <div role="radiogroup" aria-label="Count">
+            <button type="button" role="radio" data-scope="in_air" aria-checked="__SCOPE_IN_AIR__">in-air</button>
+            <button type="button" role="radio" data-scope="all" aria-checked="__SCOPE_ALL__">all</button>
+          </div>
+        </div>
+        <button type="button" class="info-btn" aria-label="About this chart" aria-expanded="false" aria-controls="chart-info-tip">i</button>
+        <p class="info-tip" id="chart-info-tip" role="tooltip">
+          <span class="info-updated">__INFO_UPDATED__</span><br>
+          ADS-B traffic w/in __DISK_NM__NM, below __CEILING_MSL_FT__MSL.<br>
+          Count: peak within __SLOT_PERIOD__ period.<br>
+          Typical: mean of same-weekday peaks.<br>
+          <a href="__REPO_URL__" target="_blank" rel="noopener noreferrer">Contribute</a>
+        </p>
+      </div>
     </header>
     <div class="chart-stage">
       <canvas id="chart" height="160"></canvas>
@@ -266,10 +304,21 @@
   <script>
     const axisLabels = __AXIS_LABELS_JSON__;
     let hourLabels = __HOUR_LABELS_JSON__;
-    const counts = __COUNTS_JSON__;
-    const typical = __TYPICAL_JSON__;
+    let peakCountsInAir = __PEAK_COUNTS_IN_AIR_JSON__;
+    let typicalCountsInAir = __TYPICAL_COUNTS_IN_AIR_JSON__;
+    let peakCountsAll = __PEAK_COUNTS_ALL_JSON__;
+    let typicalCountsAll = __TYPICAL_COUNTS_ALL_JSON__;
     const barRoles = __BAR_ROLES_JSON__;
     const pollSeconds = __POLL_SECONDS__;
+    const scopeButtons = document.querySelectorAll(".scope-toggle button");
+    let filterOnGround = [...scopeButtons].some(
+      (btn) => btn.dataset.scope === "in_air" && btn.getAttribute("aria-checked") === "true"
+    );
+    const seriesFor = (filterOnGround) =>
+      filterOnGround
+        ? { counts: peakCountsInAir, typical: typicalCountsInAir }
+        : { counts: peakCountsAll, typical: typicalCountsAll };
+    const initial = seriesFor(filterOnGround);
     const css = getComputedStyle(document.documentElement);
     const measuredOpacity = css.getPropertyValue("--bar-measured-opacity").trim() || "1";
     const barColor = (role) =>
@@ -302,7 +351,7 @@
         datasets: [
           {
             label: "Typical",
-            data: typical,
+            data: initial.typical,
             backgroundColor: typicalColor,
             borderWidth: 0,
             borderRadius: 4,
@@ -313,7 +362,7 @@
           },
           {
             label: "Measured",
-            data: counts,
+            data: initial.counts,
             backgroundColor: measuredColors,
             borderWidth: 0,
             borderRadius: 4,
@@ -377,14 +426,49 @@
         infoBtn.setAttribute("aria-expanded", open ? "false" : "true");
       });
     }
+    const applySeries = () => {
+      const s = seriesFor(filterOnGround);
+      chart.data.datasets[0].data = s.typical;
+      chart.data.datasets[1].data = s.counts;
+      chart.update();
+    };
+    const syncScopeQuery = () => {
+      const url = new URL(window.location.href);
+      if (!filterOnGround) url.searchParams.set("all", "1");
+      else url.searchParams.delete("all");
+      history.replaceState(null, "", url.pathname + url.search);
+      document.querySelectorAll(".day-nav a[href]").forEach((a) => {
+        const href = new URL(a.href);
+        if (!filterOnGround) href.searchParams.set("all", "1");
+        else href.searchParams.delete("all");
+        a.setAttribute("href", href.pathname + href.search);
+      });
+    };
+    const setFilterOnGround = (filter) => {
+      filterOnGround = filter;
+      scopeButtons.forEach((btn) => {
+        const on = btn.dataset.scope === (filter ? "in_air" : "all");
+        btn.setAttribute("aria-checked", on ? "true" : "false");
+      });
+      syncScopeQuery();
+      applySeries();
+    };
+    scopeButtons.forEach((btn) => {
+      btn.addEventListener("click", () => setFilterOnGround(btn.dataset.scope === "in_air"));
+    });
     if (pollSeconds > 0) {
       const pollUrl = new URL(window.location.href);
       pollUrl.searchParams.set("poll", "1");
       const applyPayload = (payload) => {
         hourLabels = payload.hour_labels;
+        peakCountsInAir = payload.peak_counts_in_air;
+        typicalCountsInAir = payload.typical_counts_in_air;
+        peakCountsAll = payload.peak_counts_all;
+        typicalCountsAll = payload.typical_counts_all;
         chart.data.labels = payload.axis_labels;
-        chart.data.datasets[0].data = payload.typical;
-        chart.data.datasets[1].data = payload.counts;
+        const s = seriesFor(filterOnGround);
+        chart.data.datasets[0].data = s.typical;
+        chart.data.datasets[1].data = s.counts;
         chart.data.datasets[1].backgroundColor = payload.bar_roles.map((role) =>
           withOpacity(barColor(role), measuredOpacity)
         );

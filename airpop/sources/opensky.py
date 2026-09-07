@@ -1,4 +1,4 @@
-"""OpenSky Network: count airborne aircraft in a degree bbox."""
+"""OpenSky Network: count aircraft in a degree bbox."""
 
 from opensky_api import OpenSkyApi
 
@@ -14,10 +14,10 @@ def bbox_from_center(
     return (lat - delta, lat + delta, lon - delta, lon + delta)
 
 
-def count_airborne(
+def count_in_volume(
     lat: float, lon: float, *, max_msl_ft: float, delta: float = BBOX_DELTA_DEG
-) -> int:
-    """Count aircraft in the bbox at or below max_msl_ft, not on ground."""
+) -> tuple[int, int]:
+    """Count airborne (at or below max_msl_ft) and on-ground aircraft in the bbox."""
     bbox = bbox_from_center(lat, lon, delta)
     with OpenSkyApi() as api:
         result = api.get_states(bbox=bbox)
@@ -25,15 +25,17 @@ def count_airborne(
     if result is None:
         raise RuntimeError("OpenSky request failed or was rate-limited")
 
-    count = 0
+    airborne = 0
+    on_ground = 0
     for state in result.states:
         if state.longitude is None or state.latitude is None:
             continue
         if state.on_ground:
+            on_ground += 1
             continue
         if state.baro_altitude is None:
             continue
         if state.baro_altitude * FT_PER_M > max_msl_ft:
             continue
-        count += 1
-    return count
+        airborne += 1
+    return airborne, on_ground
