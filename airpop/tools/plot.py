@@ -81,6 +81,14 @@ def floor_to_slot_minutes(dt: datetime, slot_mins: int) -> int:
     return (minutes // slot_mins) * slot_mins
 
 
+def format_slot_period(slot_mins: int = DATA_INTERVAL_MINUTES) -> str:
+    """e.g. 2-hour, 90-minute — for the info tip."""
+    hours, rem = divmod(slot_mins, 60)
+    if rem == 0 and hours > 0:
+        return f"{hours}-hour"
+    return f"{slot_mins}-minute"
+
+
 def format_clock_label(minutes: int) -> str:
     """e.g. 9am, 1:30pm, 12am."""
     minutes = minutes % MINUTES_PER_DAY
@@ -287,6 +295,7 @@ def render_chart_html(
         .replace("__AIRPORT_ICAO__", airport_icao)
         .replace("__DISK_NM__", str(DISK_NM))
         .replace("__CEILING_MSL_FT__", str(ceiling_msl))
+        .replace("__SLOT_PERIOD__", format_slot_period())
         .replace("__INFO_UPDATED__", updated_label)
         .replace("__REPO_URL__", REPO_URL)
         .replace("__DATE_LABEL__", date_label)
