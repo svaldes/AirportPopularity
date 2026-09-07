@@ -29,7 +29,7 @@ uv run collect KVGT
 
 Leave the collector running. In a separate terminal,
 ```bash
-uv run collect KVGT
+uv run serve KVGT
 ```
 The live data will be served at [http://localhost:8000/](http://localhost:8000/)
 
