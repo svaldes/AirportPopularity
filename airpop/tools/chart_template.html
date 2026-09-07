@@ -283,6 +283,8 @@
         <p class="info-tip" id="chart-info-tip" role="tooltip">
           <span class="info-updated">__INFO_UPDATED__</span><br>
           ADS-B traffic w/in __DISK_NM__NM, below __CEILING_MSL_FT__MSL.<br>
+          Count: peak within __SLOT_PERIOD__ period.<br>
+          Typical: mean of same-weekday peaks.<br>
           <a href="__REPO_URL__" target="_blank" rel="noopener noreferrer">Contribute</a>
         </p>
       </div>
@@ -318,7 +320,7 @@
         : { counts: peakCountsAll, typical: typicalCountsAll };
     const initial = seriesFor(filterOnGround);
     const css = getComputedStyle(document.documentElement);
-    const measuredOpacity = css.getPropertyValue("--bar-measured-opacity").trim() || "0.7";
+    const measuredOpacity = css.getPropertyValue("--bar-measured-opacity").trim() || "1";
     const barColor = (role) =>
       css.getPropertyValue(`--bar-${role}`).trim() || css.getPropertyValue("--bar-default").trim();
     const withOpacity = (color, opacity) => {
@@ -353,8 +355,8 @@
             backgroundColor: typicalColor,
             borderWidth: 0,
             borderRadius: 4,
-            barPercentage: 0.85,
-            categoryPercentage: 0.9,
+            barPercentage: 1,
+            categoryPercentage: 1,
             minBarLength: 3,
             order: 2,
           },
@@ -380,15 +382,17 @@
         plugins: {
           legend: { display: false },
           tooltip: {
+            mode: "index",
+            intersect: true,
             callbacks: {
               title: (items) => hourLabels[items[0].dataIndex],
               label: (ctx) => {
                 const y = ctx.parsed.y;
                 if (y == null) return null;
                 if (ctx.dataset.label === "Typical") {
-                  return `Typical: ${Number.isInteger(y) ? y : y.toFixed(1)}`;
+                  return `Typical: ${Math.round(y)}`;
                 }
-                return `Peak traffic count: ${y}`;
+                return `Count: ${y}`;
               },
             },
           },
